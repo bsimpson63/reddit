@@ -925,6 +925,57 @@ class MyredditsController(ListingController):
         self.where = where
         return ListingController.GET_listing(self, **env)
 
+class LabeledredditsController(ListingController):
+    from r2.models import LabeledMultiReddit, LabeledMultiRedditByUser
+    from r2.lib.pages import LabeledMultiList
+
+    def title(self):
+        return 'reddits: create labeled multireddit'
+
+    def GET_listing(self, **env):
+        # This version reuses the sidebar template
+        ps = PaneStack()
+        ps.append(CreateLabeledMulti(sr_ids_str=""))
+        labels = LabeledMultiRedditByUser._by_user(c.user)
+        if labels:
+            reddits = []
+            for label, sr_ids in labels.iteritems():
+                srs = Subreddit._byID(sr_ids, data=True, return_dict=False)
+                ps.append(LabeledMultiList(label, srs, editable=False, 
+                                           extra_class='full-width',
+                                           flat=True, show_edit=True,
+                                           show_link=False))
+
+        res = self.render_cls(content = ps,
+                              show_sidebar = True,
+                              nav_menus = self.menus,
+                              title = self.title(),
+                              robots = getattr(self, "robots", None),
+                              **self.render_params).render() 
+        return res
+        """
+        # This version implements a new class
+        labels = LabeledMultiRedditByUser._by_user(c.user)
+        reddits = []
+        for label, sr_ids in labels.iteritems():
+            reddits.append(LabeledMultiReddit(sr_ids, label))
+        wrap = default_thing_wrapper()
+        wrapped = []
+        for r in reddits:
+            w = wrap(r)
+            w.fullname = r._fullname
+            wrapped.append(w)
+        LabeledMultiReddit.add_props(c.user, wrapped)
+        content = SimpleTableListing(wrapped).listing()
+        res = self.render_cls(content = content,
+                              show_sidebar = True,
+                              nav_menus = self.menus,
+                              title = '',   # self.title()
+                              robots = getattr(self, "robots", None),
+                              **self.render_params).render() 
+        return res
+        """
+
 class CommentsController(ListingController):
     title_text = _('comments')
 

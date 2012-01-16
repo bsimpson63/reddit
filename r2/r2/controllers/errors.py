@@ -93,6 +93,8 @@ error_list = dict((
         ('OAUTH2_ACCESS_DENIED', _('access denied by the user')),
         ('CONFIRM', _("please confirm the form")),
         ('NO_API', _('cannot perform this action via the API')),
+        ('LABEL_EXISTS', _('multireddit label already exists')),
+        ('TOO_MANY_LABELED', _('already have maximum %(max)s labeled multireddits')),
     ))
 errors = Storage([(e, e) for e in error_list.keys()])
 

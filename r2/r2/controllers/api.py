@@ -34,7 +34,7 @@ from r2.lib.utils import query_string, timefromnow, randstr
 from r2.lib.utils import timeago, tup, filter_links
 from r2.lib.pages import EnemyList, FriendList, ContributorList, ModList, \
     BannedList, BoringPage, FormPage, CssError, UploadedImage, ClickGadget, \
-    UrlParser, WrappedUser, BoringPage
+    UrlParser, WrappedUser
 from r2.lib.pages import FlairList, FlairCsv, FlairTemplateEditor, \
     FlairSelector
 from r2.lib.utils.trial_utils import indict, end_trial, trial_info
@@ -156,7 +156,6 @@ class ApiController(RedditController):
             form.find(".btn").hide()
 
     POST_ad_inq = POST_feedback
-
 
     @validatedForm(VCaptcha(),
                    VUser(),
@@ -519,6 +518,84 @@ class ApiController(RedditController):
 
         if type in ("moderator", "contributor"):
             Subreddit.special_reddits(victim, type, _update=True)
+
+    @noresponse(VUser(),
+                VModhash(),
+                label = VPrintable('label', max_length=20),
+                sr = VSRByName('srname'))
+    def POST_removefromlabel(self, label, sr):
+        LabeledMultiRedditByUser.remove_from_label(c.user, label, sr._id)
+
+    @validatedForm(VUser(),
+                   VModhash(),
+                   ip = ValidIP(),
+                   label = VPrintable('label', max_length=20),
+                   sr = VSRByName('srname'))
+    def POST_addtolabel(self, form, jquery, ip, label, sr):
+        if form.has_errors('srname', errors.SUBREDDIT_NOEXIST):
+            return
+        ret = LabeledMultiRedditByUser.add_to_label(c.user, label, sr._id)
+        if not ret:
+            c.errors.add(errors.SUBREDDIT_EXISTS, field='srname')
+            form.set_error(errors.SUBREDDIT_EXISTS, 'srname')
+            return
+
+        form.set_inputs(srname = '')
+        form.set_html('.status:first', _('added %s' % sr.name))
+        #form.redirect('/r/~' + label)
+        # Adding to the table isn't working
+        # sr_row = LabeledMultiList(label, []).sr_row(sr)
+        # sr_row = LabeledMultiTableItem(label, sr, 'removefromlabel') 
+        # jquery("#subredditlist-table").show().find("table").insert_table_rows(sr_row)
+
+    @noresponse(VUser(),
+                VModhash(),
+                label = VPrintable('label', max_length=20))
+    def POST_deletelabel(self, label):
+        LabeledMultiRedditByUser.delete(c.user, label)
+
+    @validatedForm(VUser(),
+                   VModhash(),
+                   ip = ValidIP(),
+                   label = VLength('label', max_length=100),
+                   sr_ids_str = VLength('sr_ids_str', max_length=10000,
+                                        empty_error=None))
+    def POST_labelmulti(self, form, jquery, ip, label, sr_ids_str):
+        if form.has_errors('label', errors.TOO_LONG):
+            c.errors.add(errors.TOO_LONG, field='label')
+            form.set_error(errors.TOO_LONG, 'label')
+
+        if form.has_errors('label', errors.NO_TEXT):
+            c.errors.add(errors.NO_TEXT, field='label')
+            form.set_error(errors.NO_TEXT, 'label')
+
+        if c.errors:
+            return
+
+        if LabeledMultiRedditByUser.retrieve(c.user, label):
+            c.errors.add(errors.LABEL_EXISTS, field='label')
+            form.set_error(errors.LABEL_EXISTS, 'label')
+            return
+
+        if LabeledMultiRedditByUser.count_for_user(c.user) > LabeledMultiRedditByUser.MAX_LABELS:
+            c.errors.add(errors.TOO_MANY_LABELED,
+                         msg_params={'max': LabeledMultiRedditByUser.MAX_LABELS},
+                         field='label')
+            form.set_error(errors.TOO_MANY_LABELED, 'label')
+            return
+
+        sr_ids = []
+        if sr_ids_str:
+            for sr_id_str in sr_ids_str.split(','):
+                try:
+                    sr_ids.append(int(sr_id_str))
+                except ValueError:
+                    pass
+
+        LabeledMultiRedditByUser.create(c.user, sr_ids, label)
+        form.set_inputs(label = '')
+        form.set_html('.status:first', _('created %s' % label))
+        # form.redirect('/r/~' + label)   # Maybe include a param to redirect or not, when on myreddits might be best not to
 
     @validatedForm(VUser(),
                    VModhash(),

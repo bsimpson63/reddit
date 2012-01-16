@@ -1,0 +1,20 @@
+<%namespace file="printablebuttons.html" import="ynbutton" />
+<%namespace file="utils.html" import="plain_link"/>
+
+%if not thing.flat:
+  <tr>
+%endif
+    <td>
+      <span class="subreddit">
+        ${plain_link(thing.sr.name, thing.sr.path, _class="title")}
+      </span>
+    </td>
+    %if thing.editable:
+      <td>
+        ${ynbutton(_(thing.remove_text), "removed", thing.remove_action, callback="deleteRow",
+                   hidden_data = dict(label=thing.label, srname=thing.sr.name))}
+      </td>
+    %endif
+%if not thing.flat:
+  </tr>
+%endif

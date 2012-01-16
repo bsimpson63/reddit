@@ -4697,6 +4697,10 @@ a.pretty-button.positive.pressed {
 .lounge { display: none }
 .lounge p { margin-top: 5px; }
 
+.full-width {
+    width: 800px;
+}
+
 .gold-accent {
     margin-top: 10px;
     padding: 0 10px 5px;
@@ -4846,6 +4850,11 @@ tr.gold-accent + tr > td {
     margin: 0px 5px 15px;
     padding: 7px 10px 7px 7px;
     max-width: 550px;
+}
+
+.gold-accent a {
+    color: #9a7d2e;
+    font-weight: bold;
 }
 
 .gold-form {

@@ -32,7 +32,7 @@ import random as rand
 from r2.models.account import valid_cookie, FakeAccount, valid_feed, valid_admin_cookie
 from r2.models.subreddit import Subreddit, Frontpage
 from r2.models import *
-from errors import ErrorSet
+from errors import ErrorSet, UserRequiredException
 from validator import *
 from r2.lib.template_helpers import add_sr
 from r2.lib.jsontemplates import api_type, is_api
@@ -244,6 +244,15 @@ def over18():
             if cookie == sha1(request.ip).hexdigest():
                 return True
 
+def sr_from_multireddit_label(): 
+    if c.multireddit_label:
+        if not c.user_is_loggedin:
+            raise UserRequiredException
+        lmr = LabeledMultiRedditByUser.retrieve(c.user, c.multireddit_label)
+        if not lmr:
+            abort(404, 'notfound %s:%s' % (c.user.name, c.multireddit_label))
+        c.site = lmr
+
 def set_subreddit():
     #the r parameter gets added by javascript for POST requests so we
     #can reference c.site in api.py
@@ -253,6 +262,7 @@ def set_subreddit():
     can_stale = request.method.upper() in ('GET','HEAD')
 
     c.site = Frontpage
+    c.multireddit_label = None
     if not sr_name:
         #check for cnames
         sub_domain = request.environ.get('sub_domain')
@@ -261,6 +271,8 @@ def set_subreddit():
     elif sr_name == 'r':
         #reddits
         c.site = Sub
+    elif sr_name.startswith('~'):
+        c.multireddit_label = sr_name[1:]
     elif '+' in sr_name:
         sr_names = sr_name.split('+')
         srs = set(Subreddit._by_name(sr_names, stale=can_stale).values())
@@ -881,6 +893,11 @@ class RedditController(MinimalController):
         #if the site has a cname, but we're not using it
         elif c.site.domain and c.site.css_on_cname and not c.cname:
             c.allow_styles = False
+
+        try:
+            sr_from_multireddit_label()
+        except UserRequiredException:
+            self.intermediate_redirect('/login')
 
     def check_modified(self, thing, action,
                        private=True, max_age=0, must_revalidate=True):

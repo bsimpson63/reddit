@@ -32,6 +32,7 @@ from listingcontroller import UserController
 from listingcontroller import CommentsController
 
 from listingcontroller import MyredditsController
+from listingcontroller import LabeledredditsController
 
 from feedback import FeedbackController
 from front import FormsController

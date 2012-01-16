@@ -22,7 +22,8 @@
 from r2.lib.wrapped import Wrapped, Templated, CachedTemplate
 from r2.models import Account, FakeAccount, DefaultSR, make_feedurl
 from r2.models import FakeSubreddit, Subreddit, Ad, AdSR
-from r2.models import Friends, All, Sub, NotFound, DomainSR, Random, Mod, RandomNSFW, MultiReddit, ModSR, Frontpage
+from r2.models import Friends, All, Sub, NotFound, DomainSR, Random, Mod, \
+    RandomNSFW, MultiReddit, ModSR, Frontpage, LabeledMultiReddit
 from r2.models import Link, Printable, Trophy, bidding, PromotionWeights, Comment
 from r2.models import Flair, FlairTemplate, FlairTemplateBySubredditIndex
 from r2.models import USER_FLAIR, LINK_FLAIR
@@ -237,10 +238,17 @@ class Reddit(Templated):
 
         no_ads_yet = True
         if isinstance(c.site, (MultiReddit, ModSR)) and c.user_is_loggedin:
-            srs = Subreddit._byID(c.site.sr_ids,data=True,
-                                  return_dict=False)
-            if srs:
+            is_labeled = isinstance(c.site, LabeledMultiReddit)
+            srs = Subreddit._byID(c.site.sr_ids, data=True, return_dict=False)
+            if is_labeled:
+                ps.append(LabeledMultiList(c.site.real_path, srs))
+            elif srs:
                 ps.append(SideContentBox(_('these reddits'),[SubscriptionBox(srs=srs)]))
+                if c.user.gold:
+                    sr_ids_str = ','.join([str(sr._id) for sr in srs])
+                    ps.append(CreateLabeledMulti(sr_ids_str=sr_ids_str, 
+                                                 _class='rounded gold-accent',
+                                                 show_link=True))
 
         # don't show the subreddit info bar on cnames unless the option is set
         if not isinstance(c.site, FakeSubreddit) and (not c.cname or c.site.show_cname_sidebar):
@@ -1444,6 +1452,95 @@ class SubredditTopBar(CachedTemplate):
             menus.append(self.popular_reddits(exclude=self.my_reddits))
 
         return menus
+
+class LabeledMultiForm(Templated):
+    def __init__(self, srs):
+        self.sr_ids = [sr._id for sr in srs]
+        Templated.__init__(self)
+
+class LabeledMultiRedditBox(Templated):
+    def __init__(self, label, srs):
+        self.label = label
+        srs.sort(key = lambda sr: sr.name.lower())
+        self.srs = srs
+        Templated.__init__(self, srs=srs)
+
+    @property
+    def reddits(self):
+        return wrap_links(self.srs)
+
+class SubredditTableItem(Templated):
+    def __init__(self, sr, remove_action, remove_text='remove', **attr):
+        self.sr = sr
+        self.remove_text = remove_text
+        self.remove_action = remove_action
+        Templated.__init__(self, **attr)
+
+class SubredditList(Templated):
+    remove_action = ''
+    _class = 'rounded gold-accent'
+
+    def __init__(self, srs, **child_attrs):
+        self._srs = srs
+        self.child_attrs = child_attrs
+        Templated.__init__(self)
+
+    def sr_row(self, sr):
+        return SubredditTableItem(sr, self.remove_action, **self.child_attrs) 
+
+    @property
+    def srs(self):
+        return [self.sr_row(sr) for sr in self._srs]
+
+class CreateLabeledMulti(Templated):
+    _class = ''
+    all_link = '/reddits/mine/labeled'
+
+    def __init__(self, sr_ids_str='', _class='', show_link=False):
+        self._class = _class
+        self.sr_ids_str = sr_ids_str
+        self.show_link = show_link
+        Templated.__init__(self)
+
+class LabeledMultiTableItem(SubredditTableItem):
+    def __init__(self, label, sr, editable, remove_action, remove_text='remove', flat=False):
+        self.label = label
+        self.sr = sr
+        self.editable = editable
+        self.remove_action = remove_action
+        self.remove_text = remove_text
+        self.flat = flat
+        Templated.__init__(self)
+
+class LabeledMultiList(SubredditList):
+    remove_action = 'removefromlabel'
+    delete_action = 'deletelabel'
+    _class = 'rounded gold-accent'
+    all_link = '/reddits/mine/labeled'
+
+    def __init__(self, label, srs, flat=False, editable=True, addable=None, 
+                 extra_class=None, show_edit=False, show_delete=True, 
+                 show_link=True, **kw):
+        self.label = label
+        self.path = '/r/~' + label
+        self._srs = srs
+        self.flat = flat
+        self.editable = editable
+        if addable is None:
+            addable = editable
+        self.addable = addable
+        self.extra_class = extra_class
+        self.show_edit = show_edit
+        self.show_delete = show_delete
+        self.show_link = show_link
+        Templated.__init__(self)
+
+    def sr_row(self, label, sr):
+        return LabeledMultiTableItem(label, sr, self.editable, self.remove_action, flat=self.flat)
+
+    @property
+    def srs(self):
+        return [self.sr_row(self.label, sr) for sr in self._srs]
 
 class SubscriptionBox(Templated):
     """The list of reddits a user is currently subscribed to to go in

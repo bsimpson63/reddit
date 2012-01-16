@@ -1,0 +1,14 @@
+<div class=''>
+  <form action='/post/labelmulti'
+        method='post', class='pretty-form medium-text'
+        onsubmit='return post_form(this, "labelmulti");'
+        id='labelmulti'>
+    <h1>Label this multireddit</h1>
+    <input type='text' name='label', style='width:25em'/>
+    <input type="hidden" name="sr_ids_str" value="${thing.sr_ids}"/>
+    <button class="btn" type="submit">${_("add")}</button>
+    <span class="status"></span>
+    ${error_field('BAD_STRING', 'label')}
+    ${error_field('LABEL_EXISTS', 'label')}
+  </form>
+</div>

@@ -65,7 +65,7 @@ def make_map(global_conf={}, app_conf={}):
     mc('/reddits/mine/:where', controller='myreddits', action='listing',
        where='subscriber',
        requirements=dict(where='subscriber|contributor|moderator'))
-
+    mc('/reddits/mine/labeled', controller='labeledreddits', action='listing')
     mc('/buttons', controller='buttons', action='button_demo_page')
     mc('/upgradebuttons', controller='buttons', action='upgrade_buttons')
     #the frame
@@ -155,6 +155,7 @@ def make_map(global_conf={}, app_conf={}):
     mc('/health', controller='health', action='health')
 
     mc('/', controller='hot', action='listing')
+    # mc('/m/:label', controller='multi', action='listing')
 
     listing_controllers = "hot|saved|new|randomrising|comments"
 

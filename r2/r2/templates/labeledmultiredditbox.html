@@ -1,0 +1,18 @@
+<%namespace file="utils.html" import="plain_link"/>
+<%namespace file="printablebuttons.html" import="ynbutton" />
+
+<div class="rounded gold-accent">
+  ${thing.label}
+  <table>
+    %for sr in thing.reddits:
+      <tr>
+        <td>${plain_link(sr.name, sr.path, _class="title")}</td>
+        <td>${ynbutton(_("remove"), "removed", thing.remove_action,
+                 callback="deleteRow",
+                 hidden_data = dict(type = thing.type,
+                                    id = thing.user._fullname,
+                                    container = thing.container_name))}</td>
+      </tr>
+    %endfor
+  </table>    
+</div>

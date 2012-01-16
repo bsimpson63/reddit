@@ -1,0 +1,37 @@
+<%namespace file="utils.html" import="error_field, plain_link"/>
+<%namespace file="printablebuttons.html" import="ynbutton" />
+
+<div class="${thing._class} ${thing.extra_class}">
+  <h1>${thing.label}</h1>
+  %if thing.show_edit:
+    ${plain_link(_("view/edit"), thing.path, _class="title")}
+  %endif
+  %if thing.show_delete:
+    ${ynbutton(_("delete"), "deleted", thing.delete_action, callback='null',
+               hidden_data = dict(label=thing.label))}
+  %endif
+  %if thing.addable:
+    <form action="/post/addtolabel"
+          method="post" class="pretty-form medium-text"
+          onsubmit="return post_form(this, 'addtolabel');"
+          id="${thing.label}">
+      <input type="hidden" name="label" value="${thing.label}"/>
+      <input type="text" name="srname" id="srname" style="width:12em"/>
+      <button class="btn" type="submit">${_("add")}</button>
+      <span class="status"></span>
+      ${error_field("SUBREDDIT_NOEXIST", "srname")}
+      ${error_field("SUBREDDIT_EXISTS", "srname")}
+    </form>
+  %endif
+
+  <div id="subredditlist-table" style="">
+    <table>
+      %for item in thing.srs:
+        ${item}
+      %endfor
+    </table>
+  </div>
+  %if thing.show_link:
+    ${plain_link(_("see all labels"), thing.all_link, _class="title")}
+  %endif
+</div>

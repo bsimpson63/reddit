@@ -91,6 +91,14 @@ class Listing(object):
 
 class TableListing(Listing): pass
 
+class SimpleTableListing(TableListing):
+    def __init__(self, wrapped_items):
+        self.things = wrapped_items
+        self.nextprev = False
+
+    def listing(self):
+        return Wrapped(self)
+
 class ModActionListing(TableListing): pass
 
 class LinkListing(Listing):

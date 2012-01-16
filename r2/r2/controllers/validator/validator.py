@@ -526,6 +526,17 @@ class VSubredditName(VRequired):
             except NotFound:
                 return name
 
+class VSRByName(Validator):
+    def run(self, sr_name):
+        if not sr_name:
+            self.set_error(errors.BAD_SR_NAME)
+        else:
+            try:
+                sr = Subreddit._by_name(sr_name)
+                return sr
+            except tdb_cassandra.NotFound:
+                self.set_error(errors.SUBREDDIT_NOEXIST)
+
 class VSubredditTitle(Validator):
     def run(self, title):
         if not title:
@@ -1341,7 +1352,6 @@ class VCommentIDs(Validator):
             comments = Comment._byID(cids, data=True, return_dict = False)
             return comments
         return []
-
 
 class CachedUser(object):
     def __init__(self, cache_prefix, user, key):

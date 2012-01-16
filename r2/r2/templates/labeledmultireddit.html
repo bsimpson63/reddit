@@ -1,0 +1,12 @@
+
+<%namespace file="utils.html" import="plain_link"/>
+
+## view/edit link
+## delete link
+## rename form
+<div class="">
+  <h1>${thing.label}</h1>
+  %for sr_name in thing.sr_names:
+    ${plain_link(sr_name, "/r/" + sr_name, _class="title")}
+  %endfor
+</div>

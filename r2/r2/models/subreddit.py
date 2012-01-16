@@ -915,6 +915,104 @@ class MultiReddit(_DefaultSR):
         results = [get_sr_comments(sr) for sr in srs]
         return merge_results(*results)
 
+class LabeledMultiReddit(MultiReddit):
+    name = 'labeled multi'
+
+    @property
+    def path(self):
+        return '/r/~' + self.real_path
+
+    @property
+    def label(self):
+        return self.real_path
+
+    @classmethod
+    def add_props(cls, user, wrapped):
+        sr_ids = []
+        for w in wrapped:
+            sr_ids.extend(w.sr_ids)
+        srs = Subreddit._byID(set(sr_ids), data=True, return_dict=False)
+        sr_names = dict((sr._id, sr.name) for sr in srs)
+
+        for w in wrapped:
+            w.sr_names = []
+            for sr_id in w.sr_ids:
+                w.sr_names.append(sr_names[sr_id])
+
+        # Printable.add_props(user, wrapped)
+
+    @property
+    def _fullname(self):
+        return 'lmr_%s_%s' % (self.label, '_'.join(str(i) for i in self.sr_ids))
+
+class LabeledMultiRedditByUser(tdb_cassandra.View):
+    _use_db = True
+    _connection_pool = 'main'
+    _value_type = 'pickle'      # all columns are lists of sr ids
+                                # might want to use different storage, can't use get_column because stuff isn't unpickled
+
+    MAX_LABELS = 10
+
+    @classmethod
+    def create(cls, user, sr_ids, label):
+        rowkey = user._id36
+        column = {label: sr_ids}
+        cls._set_values(rowkey, column)
+
+    @classmethod
+    def _get_sr_ids(cls, user, label):
+        try:
+            return cls.get_columns(user._id36, label)
+        except tdb_cassandra.NotFound:
+            return
+
+    @classmethod
+    def retrieve(cls, user, label):
+        sr_ids = cls._get_sr_ids(user, label)
+        if sr_ids == []:
+            return LabeledMultiReddit([], label)
+        elif sr_ids:
+            return LabeledMultiReddit(sr_ids, label)
+
+    @classmethod
+    def add_to_label(cls, user, label, sr_id):
+        sr_ids = cls._get_sr_ids(user, label)
+        if sr_id in sr_ids:
+            return False
+        sr_ids.append(sr_id)
+        cls.create(user, sr_ids, label)
+        return True
+
+    @classmethod
+    def remove_from_label(cls, user, label, sr_id):
+        sr_ids = cls._get_sr_ids(user, label)
+        if not sr_ids:
+            return False
+        try:
+            sr_ids.remove(sr_id)
+        except ValueError:
+            return False
+        cls.create(user, sr_ids, label)
+        return True
+
+    @classmethod
+    def delete(cls, user, label):
+        sr_ids = cls._get_sr_ids(user, label)
+        rowkey = user._id36
+        column = {label: sr_ids}
+        cls.remove_column(rowkey, column)
+
+    @classmethod
+    def _by_user(cls, user):
+        try:
+            return cls._byID(user._id36)._t
+        except tdb_cassandra.NotFound:
+            return
+
+    @classmethod
+    def count_for_user(cls, user):
+        return cls._cf.get_count(user._id36)
+
 class RandomReddit(FakeSubreddit):
     name = 'random'
     header = ""

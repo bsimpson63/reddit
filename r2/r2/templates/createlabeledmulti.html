@@ -1,0 +1,24 @@
+<%namespace file="utils.html" import="error_field"/>
+<%namespace file="utils.html" import="plain_link"/>
+
+<div class="${thing._class}">
+  <h1>${_("Create New Labeled Multireddit")}</h1>
+  <form action="/post/labelmulti"
+          method="post" class="pretty-form medium-text"
+          onsubmit="return post_form(this, 'labelmulti');"
+          id="labelmulti">
+      <input type="hidden" name="sr_ids_str" value="${thing.sr_ids_str}"/>
+      <input type="text" name="label" id="label" style="width:12em"/>
+      <button class="btn" type="submit">${_("create")}</button>
+      <span class="status"></span>
+      ${error_field("LABEL_EXISTS", "label")}
+      ${error_field("TOO_LONG", "label")}
+      ${error_field("NO_TEXT", "label")}
+      ${error_field("TOO_MANY_LABELED", "label")}
+    </form>
+    %if thing.show_link:
+    <span class="subreddit">
+      ${plain_link("See all your labeled multireddits", thing.all_link, _class="title")}
+    </span>
+  %endif
+</div>
