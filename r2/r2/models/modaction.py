@@ -6,6 +6,12 @@ from uuid import UUID
 from pylons.i18n import _
 from pylons import request
 
+from pycassa.types import CompositeType, DateType, UTF8Type
+from pycassa.util import convert_time_to_uuid
+from pycassa.system_manager import DATE_TYPE, COUNTER_COLUMN_TYPE
+from collections import defaultdict
+import datetime
+
 class ModAction(tdb_cassandra.UuidThing, Printable):
     """
     Columns:
@@ -313,3 +319,128 @@ class ModActionBySRAction(tdb_cassandra.View):
     @classmethod
     def _rowkey(cls, ma):
         return '%s_%s' % (ma.sr_id36, ma.action)
+
+class ModActionHistory(tdb_cassandra.View):
+    _use_db = True
+    _connection_pool = 'main'
+    _value_type = 'int'
+    _compare_with = CompositeType(DateType(), UTF8Type(), UTF8Type())
+    _timestamp_prop = None
+    _ttl = 60*60*24*30*3
+
+    @classmethod
+    def _rowkey(cls, ma):
+        return ma.sr_id36
+
+    # Columns are objects are columns
+    @classmethod
+    def _column_to_obj(cls, columns):
+        for c in columns:
+            for k,v in c.iteritems():
+                c[k] = cls._deserialize_column(k, v)
+        return columns
+
+    @classmethod
+    def _obj_to_column(cls, objs):
+        return objs
+
+    @staticmethod
+    def _date_only(date):
+        if isinstance(date, datetime.datetime):
+            date = date.date()
+        return datetime.datetime.combine(date, datetime.time())
+
+    @classmethod
+    def get_day(cls, sr, date):
+        date = cls._date_only(date)
+        rowkey = sr._id36
+        d = defaultdict(int)
+
+        q = cls.query(rowkey)
+        q.column_start = (date + datetime.timedelta(days=1),)
+        q.column_finish = (date,)
+        columns = list(q)
+        while columns:
+            for c in columns:
+                for (date, mod_id36, action),v in c.iteritems():
+                    key = (mod_id36, action)
+                    d[key] = v
+            q._after(columns[-1])
+            columns = list(q)
+        return d
+
+    @classmethod
+    def get_report(cls, sr, start_date, end_date):
+        d = defaultdict(int)
+        start_date = cls._date_only(start_date)
+        end_date = cls._date_only(end_date)
+        current_date = start_date
+        delta = datetime.timedelta(days=1)
+        while current_date <=  end_date:
+            d_new = cls.get_day(sr, current_date)
+            for k,v in d_new.iteritems():
+                d[k] += v
+            current_date += delta
+        return d
+
+    @classmethod
+    def _query_all_srs(cls, date):
+        CHUNK_SIZE = 1000
+        actions_by_sr = {}
+        date = cls._date_only(date)
+
+        start_uuid = convert_time_to_uuid(date)
+        end_uuid = convert_time_to_uuid(date + datetime.timedelta(days=1))
+        view_cls = ModActionBySR
+
+        q = tdb_cassandra.RangeQuery(view_cls, column_start=end_uuid,
+                                     column_finish=start_uuid,
+                                     column_reversed=True,
+                                     column_to_obj=view_cls._column_to_obj,
+                                     obj_to_column=view_cls._obj_to_column,
+                                     column_count=CHUNK_SIZE)
+        actions = list(q)
+        while actions:
+            for ma in actions:
+                sr_id36 = ma.sr_id36
+                key = (date, ma.mod_id36, ma.action)
+                actions_by_sr.setdefault(sr_id36, defaultdict(int))[key] += 1
+
+            q._after(actions[-1])
+            actions = list(q)
+
+        return actions_by_sr
+
+    @classmethod
+    def _write_all_srs(cls, date=None):
+        if not date:
+            date = datetime.datetime.now(g.tz)
+
+        actions_by_sr = cls._query_all_srs(date)
+        for sr_id36, columns in actions_by_sr.iteritems():
+            cls._set_values(sr_id36, columns)
+
+    @classmethod
+    def test(cls):
+        today = datetime.datetime.now()
+        earliest = today - datetime.timedelta(days=90)
+        delta = datetime.timedelta(days=1)
+        r = defaultdict(dict)
+        current = earliest
+        while current <= today:
+            print 'Fetching %s' % current
+            for k,v in ModActionHistory._query_all_srs(current).iteritems():
+                r[k].update(v)
+            current += delta
+        return r
+
+    @classmethod
+    def write_history(cls):
+        today = datetime.datetime.now()
+        earliest = today - datetime.timedelta(days=90)
+        delta = datetime.timedelta(days=1)
+        current = earliest
+        while current <= today:
+            print 'Writing %s' % current
+            ModActionHistory._write_all_srs(current)
+            current += delta
