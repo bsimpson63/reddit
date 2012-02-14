@@ -976,7 +976,8 @@ class ColumnQuery(object):
                 try:
                     del columns[column_start]
                 except KeyError:
-                    columns.popitem(last=True)  # remove extra column
+                    if len(columns) == column_count:
+                        columns.popitem(last=True)  # remove extra column
 
             if not columns:
                 return
