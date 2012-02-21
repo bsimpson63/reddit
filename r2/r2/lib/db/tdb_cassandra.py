@@ -871,14 +871,15 @@ class Relation(ThingBase):
 
 class ColumnQuery(object):
     """
-    A query across a row of a CF.
+    A query across a row of a CF. Returns requested number of columns from set
+    of columns from all rowkeys. 
     """
-    _chunk_size = 100
 
     def __init__(self, cls, rowkeys, column_start="", column_finish="", 
                  column_count=100, column_reversed=True, 
                  column_to_obj=None,
-                 obj_to_column=None):
+                 obj_to_column=None,
+                 enforce_column_count=True):
         self.cls = cls
         self.rowkeys = rowkeys
         self.column_start = column_start
@@ -887,6 +888,7 @@ class ColumnQuery(object):
         self.column_reversed = column_reversed
         self.column_to_obj = column_to_obj or self.default_column_to_obj
         self.obj_to_column = obj_to_column or self.default_obj_to_column
+        self.enforce_column_count = enforce_column_count
         self._rules = []    # dummy parameter to mimic tdb_sql queries
 
         # Sorting for TimeUuid objects
@@ -939,67 +941,81 @@ class ColumnQuery(object):
         # Logic of standard reddit query is opposite of cassandra
         self.column_reversed = False
 
-    def __iter__(self, yield_column_names=False):
-        retrieved = 0
-        column_start = self.column_start
-        while retrieved < self._limit:
-            try:
-                column_count = min(self._chunk_size, self._limit - retrieved)
-                if column_start:
-                    column_count += 1   # cassandra includes column_start
-                r = self.cls._cf.multiget(self.rowkeys,
-                                          column_start=column_start,
-                                          column_finish=self.column_finish,
-                                          column_count=column_count,
-                                          column_reversed=self.column_reversed)
+    def _get_columns(self):
+        column_count = self._limit
+        if self.column_start:
+            column_count += 1   # column_start is inclusive, usually want to exclude it
 
-                # multiget returns OrderedDict {rowkey: {column_name: column_value}}
-                # combine into single OrderedDict of {column_name: column_value}
-                nrows = len(r.keys())
-                if nrows == 0:
-                    return
-                elif nrows == 1:
-                    columns = r.values()[0]
-                else:
-                    r_combined = {}
-                    for d in r.values():
-                        r_combined.update(d)
-                    columns = OrderedDict(sorted(r_combined.items(),
-                                                 key=lambda t: self.sort_key(t[0]),
-                                                 reverse=self.column_reversed))
-            except NotFoundException:
-                return
+        try:
+            r = self.cls._cf.multiget(self.rowkeys,
+                               column_start=self.column_start,
+                               column_finish=self.column_finish,
+                               column_count=column_count,
+                               column_reversed=self.column_reversed)
+        except NotFoundException:
+            return {}
 
-            retrieved += self._chunk_size
-
-            if column_start:
+        if self.column_start:
+            for rowkey, columns in r.iteritems():
                 try:
-                    del columns[column_start]
+                    del columns[self.column_start]
                 except KeyError:
                     if len(columns) == column_count:
-                        columns.popitem(last=True)  # remove extra column
+                        columns.popitem(last=True) # remove extra column
+        return r
 
-            if not columns:
-                return
+    def _flatten_columns(self, r, max_columns):
+        if len(r) == 1:
+            columns = r.values()[0]
+            return [{t[0]:t[1]} for t in columns.items()]
 
-            # Convert to list of columns
-            l_columns = [{col_name: columns[col_name]} for col_name in columns]
+        l_columns = []
+        last_item = None
 
-            column_start = l_columns[-1].keys()[0]
-            objs = self.column_to_obj(l_columns)
+        if not self.enforce_column_count:
+            last_items = {}
+            last_items = [columns.items()[-1] for columns in r.values() \
+                          if len(columns) == max_columns]
+            if last_items:
+                last_item = sorted(last_items, key=lambda t: self.sort_key(t[0]),
+                                   reverse=self.column_reversed)[0]
 
-            if yield_column_names:
-                column_names = [column.keys()[0] for column in l_columns]
-                if len(column_names) == 1:
-                    ret = (column_names[0], objs),
-                else:
-                    ret = zip(column_names, objs)
+        for rowkey, columns in r.iteritems():
+            l_columns.extend(columns.items())
+
+        l_columns.sort(key=lambda t: self.sort_key(t[0]),
+                       reverse=self.column_reversed)
+
+        if last_item:
+            safe_index = l_columns.index(last_item) + 1
+            l_columns = l_columns[:safe_index]
+        elif len(l_columns) > self._limit:
+            l_columns = l_columns[:self._limit]
+
+        return [{t[0]:t[1]} for t in l_columns]
+
+    def __iter__(self, yield_column_names=False):
+
+        r = self._get_columns()
+        l_columns = self._flatten_columns(r, self._limit)
+
+        if not l_columns:
+            return
+
+        objs = self.column_to_obj(l_columns)
+
+        if yield_column_names:
+            column_names = [column.keys()[0] for column in l_columns]
+            if len(column_names) == 1:
+                ret = (column_names[0], objs),
             else:
-                ret = objs
+                ret = zip(column_names, objs)
+        else:
+            ret = objs
 
-            ret, is_single = tup(ret, ret_is_single=True)
-            for r in ret:
-                yield r
+        ret, is_single = tup(ret, ret_is_single=True)
+        for r in ret:
+            yield r
 
     def __repr__(self):
         return "<%s(%s-%r)>" % (self.__class__.__name__, self.cls.__name__, 
@@ -1187,11 +1203,11 @@ class View(ThingBase):
         """Mapping from view column --> _view_of object. Must be complement to
         _obj_to_column()."""
         columns, is_single = tup(columns, ret_is_single=True)
-
         ids = [column.keys()[0] for column in columns]
 
         if len(ids) == 1:
             ids = ids[0]
+
         return cls._view_of._byID(ids, return_dict=False)
 
     @classmethod
