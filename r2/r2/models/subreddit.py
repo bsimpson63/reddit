@@ -939,6 +939,9 @@ class ModSR(ModContribSR):
     query_param = "moderator"
     real_path = "mod"
 
+    def is_moderator(self, user):
+        return True
+
 class ContribSR(ModContribSR):
     name  = "contrib"
     title = "communities you're approved on"

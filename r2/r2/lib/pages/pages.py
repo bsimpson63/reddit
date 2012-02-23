@@ -184,6 +184,15 @@ class Reddit(Templated):
 
         self.toolbars = self.build_toolbars()
 
+    def sr_limited_admin_menu(self):
+        buttons = [NamedButton('modqueue', css_class = 'reddit-modqueue'),
+                   NamedButton('reports', css_class = 'reddit-reported'),
+                   NamedButton('spam', css_class = 'reddit-spam'),
+                   NamedButton('trials', css_class = 'reddit-trials'),
+                   NamedButton('log', css_class = 'reddit-moderationlog')]
+        return [NavMenu(buttons, type = "flat_vert", base_path = "/about/",
+                        css_class = "icon-menu",  separator = '')]
+
     def sr_admin_menu(self):
         buttons = [NavButton(menu.community_settings, css_class = 'reddit-edit',
                              dest = "edit"),
@@ -290,6 +299,9 @@ class Reddit(Templated):
                 (c.site.is_moderator(c.user) or c.user_is_admin)):
                 ps.append(SideContentBox(_('admin box'), self.sr_admin_menu()))
 
+        if isinstance(c.site, MultiReddit) or isinstance(c.site, ModSR) or
+           isinstance(c.site, ModMinusSR)) and not c.cname:
+           ps.append(SideContentBox(_('admin box'), self.sr_limited_admin_menu()))
 
         if no_ads_yet and not g.disable_ads:
             if c.user.pref_show_adbox or not c.user.gold:
