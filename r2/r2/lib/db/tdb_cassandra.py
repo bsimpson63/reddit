@@ -1021,6 +1021,80 @@ class ColumnQuery(object):
         return "<%s(%s-%r)>" % (self.__class__.__name__, self.cls.__name__, 
                                 self.rowkeys)
 
+class RangeQuery(ColumnQuery):
+    """Query over some/all rows of a CF. Returns either requested number of
+    columns per row or all columns for each row."""
+    CHUNK_SIZE = 1000
+
+    def __init__(self, cls, all_columns=True, sort=False, **kw):
+        # Could allow rowkeys to be specified, but with RandomPartitioner that
+        # isn't really useful
+        ColumnQuery.__init__(self, cls, None, **kw)
+        self.all_columns = all_columns
+        self.sort = sort
+        if all_columns:
+            self._limit = self.CHUNK_SIZE
+
+    def _get_columns(self):
+        column_count = self._limit
+
+        if self.column_start:
+            column_count += 1   # column_start is inclusive, usually want to exclude it
+
+        try:
+            q = self.cls._cf.get_range(column_start=self.column_start,
+                                       column_finish=self.column_finish,
+                                       column_count=column_count,
+                                       column_reversed=self.column_reversed)
+            r = list(q)
+            r = dict(((t[0], t[1]) for t in r))
+        except NotFoundException:
+            return {}
+
+        if self.all_columns:
+            need_more = {}
+            for rowkey, columns in r.iteritems():
+                if len(columns) == column_count:
+                    need_more[rowkey] = columns.popitem(last=True)[0]   # safe to pop this, we'll re-get it
+            while need_more:
+                for rowkey, after in need_more.items():
+                    columns = self.cls._cf.get(rowkey, column_start=after,
+                                               column_finish=self.column_finish,
+                                               column_count=column_count,
+                                               column_reversed=self.column_reversed)
+                    r[rowkey].update(columns)
+                    if len(columns) == column_count:
+                        need_more[rowkey] = columns.popitem(last=True)[0]
+                    else:
+                        del need_more[rowkey]
+
+        if self.column_start:
+            for rowkey, columns in r.iteritems():
+                try:
+                    del columns[self.column_start]
+                except KeyError:
+                    if not self.all_columns and len(columns) == column_count:
+                        columns.popitem(last=True) # remove extra column
+        return r
+
+    def _flatten_columns(self, r, max_columns):
+        if len(r) == 1:
+            columns = r.values()[0]
+            return [{t[0]:t[1]} for t in columns.items()]
+
+        l_columns = []
+        for rowkey, columns in r.iteritems():
+            l_columns.extend(columns.items())
+
+        if self.sort:
+            l_columns.sort(key=lambda t: self.sort_key(t[0]),
+                           reverse=self.column_reversed)
+
+        return [{t[0]:t[1]} for t in l_columns]
+
+    def __repr__(self):
+        return "<%s(%s)>" % (self.__class__.__name__, self.cls.__name__)
+
 class MultiColumnQuery(object):
     def __init__(self, queries, num, sort_key=None):
         self.num = num
