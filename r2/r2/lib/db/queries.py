@@ -926,7 +926,8 @@ def new_spam_filtered_links(things):
             insert_items = []
             delete_items = []
             for l in links:
-                if l._spam and getattr(l, 'verdict', None) != 'mod-removed']:
+                if l._spam and not l._deleted and \
+                   getattr(l, 'verdict', None) != 'mod-removed':
                     insert_items.append(l)
                 else:
                     delete_items.append(l)
