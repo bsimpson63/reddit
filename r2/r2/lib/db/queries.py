@@ -354,10 +354,10 @@ def get_reported(sr):
         q = []
         q.extend(get_reported_links(sr) for sr in srs)
         q.extend(get_reported_comments(sr) for sr in srs)
-        return MergedCachedQuery(*q)
+        return MergedCachedQuery(q)
     else:
-        return MergedCachedQuery(get_reported_links(sr),
-                                 get_reported_comments(sr))
+        return MergedCachedQuery([get_reported_links(sr),
+                                  get_reported_comments(sr)])
 
 # TODO: Wow, what a hack. I'm doing this in a hurry to make
 # /r/blah/about/trials and /r/blah/about/modqueue work. At some point
@@ -421,7 +421,7 @@ def get_modqueue(sr):
         q.append(get_reported_comments(sr))
         q.append(get_spam_filtered_links(sr))
 
-    return MergedCachedQuery(*results)
+    return MergedCachedQuery(q)
 
 def get_domain_links_old(domain, sort, time):
     return DomainSearchQuery(domain, sort=search_sort[sort], timerange=time)
