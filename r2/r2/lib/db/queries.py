@@ -321,6 +321,15 @@ def get_spam(sr):
         return merge_results(get_spam_links(sr),
                              get_spam_comments(sr))
 
+@cached_query(SubredditQueryCache)
+def get_spam_filtered_links(sr):
+    """ NOTE: This query will never run unless someone does an "update" on it,
+        but that will probably timeout. Use insert_spam_filtered_links."""
+    return Link._query(Link.c.sr_id == sr._id,
+                       Link.c._spam == True,
+                       Link.c.verdict != 'mod-removed',
+                       sort = db_sort('new'))
+
 def get_reported_links(sr):
     q_l = Link._query(Link.c.reported != 0,
                       Link.c.sr_id == sr._id,
@@ -403,14 +412,12 @@ def get_modqueue(sr):
         for sr in srs:
             results.append(get_reported_links(sr))
             results.append(get_reported_comments(sr))
-            results.append(get_spam_links(sr))
-            results.append(get_spam_comments(sr))
+            results.append(get_spam_filtered_links(sr))
     else:
         results.append(get_trials_links(sr))
         results.append(get_reported_links(sr))
         results.append(get_reported_comments(sr))
-        results.append(get_spam_links(sr))
-        results.append(get_spam_comments(sr))
+        results.append(get_spam_filtered_links(sr))
 
     return merge_results(*results)
 
@@ -901,6 +908,46 @@ def clear_reports(things):
             add_queries([get_reported_links(sr)], delete_items = links)
         if comments:
             add_queries([get_reported_comments(sr)], delete_items = comments)
+
+# Items should be in the filter list if:
+# they are spam and verdict != 'mod-removed'
+# What to do with shit that gets deleted?
+def new_spam_filtered_links(things):
+    by_srid, srs = _by_srid(things)
+    if not by_srid:
+        return
+
+    for sr_id, sr_things in by_srid.iteritems():
+        sr = srs[sr_id]
+        links = [ x for x in sr_things if isinstance(x, Link) ]
+        insert_items = set([l for l in links \
+                            if l._spam and \
+                               getattr(l, 'verdict', None) != 'mod-removed'])
+        delete_items = set(links) - insert_items
+        add_queries([get_spam_filtered_links(sr)], insert_items=insert_items,
+                    delete_items=delete_items)
+
+def find_spam_filtered_links(sr):
+    """ Identify spam filtered links - those that are spam but don't have
+        verdict set as 'mod-removed' (this happens in end_trial)."""
+    fullnames = get_spam_links(sr)
+    links = Thing._by_fullname(fullnames, data=True, return_dict=False)
+    filtered = [l for l in links \
+                if l._spam and not l._deleted and \
+                getattr(l, 'verdict', None) != 'mod-removed']
+    return filtered
+
+def set_spam_filtered_links(sr):
+    filtered = find_spam_filtered_links(sr)
+    #with CachedQueryMutator() as m:
+    #    m.insert(get_spam_filtered_links(sr), filtered)
+    add_queries([get_spam_filtered_links(sr)], insert_items=filtered)
+
+def populate_spam_filtered_links():
+    q = Subreddit._query(sort = asc('_date'))
+    for sr in fetch_things2(q):
+        print 'Processing %s' % sr.name
+        set_spam_filtered_links(sr)
 
 def add_all_ban_report_srs():
     """Adds the initial spam/reported pages to the report queue"""
