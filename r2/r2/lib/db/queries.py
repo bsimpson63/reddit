@@ -922,9 +922,13 @@ def new_spam_filtered_links(things):
         for sr_id, sr_things in by_srid.iteritems():
             sr = srs[sr_id]
             links = [ x for x in sr_things if isinstance(x, Link) ]
-            insert_items = set([l for l in links if l._spam and
-                                getattr(l, 'verdict', None) != 'mod-removed'])
-            delete_items = set(links) - insert_items
+            insert_items = []
+            delete_items = []
+            for l in links:
+                if l._spam and getattr(l, 'verdict', None) != 'mod-removed']:
+                    insert_items.append(l)
+                else:
+                    delete_items.append(l)
             m.insert(get_spam_filtered_links(sr), insert_items)
             m.delete(get_spam_filtered_links(sr), delete_items)
 
