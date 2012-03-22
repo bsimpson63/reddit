@@ -416,3 +416,11 @@ def populate_spam_filtered_links():
     for sr in fetch_things2(q):
         print 'Processing %s' % sr.name
         set_spam_filtered_links(sr)
+
+def convert_reports_to_querycache():
+    from r2.lib.db import queries
+    q = Subreddit._query(sort = asc('_date'))
+    for sr in fetch_things2(q):
+        print 'Processing %s' % sr.name
+        queries.get_reported_links(sr).update()
+        queries.get_reported_comments(sr).update()
