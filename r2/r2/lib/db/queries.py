@@ -9,7 +9,8 @@ from r2.lib.solrsearch import DomainSearchQuery
 from r2.lib import amqp, sup, filters
 from r2.lib.comment_tree import add_comments, update_comment_votes
 from r2.models.query_cache import cached_query, merged_cached_query, \
-    UserQueryCache, SubredditQueryCache, CachedQueryMutator, CachedQuery
+    UserQueryCache, SubredditQueryCache, CachedQueryMutator, CachedQuery, \
+    MergedCachedQuery
 from r2.models.query_cache import ThingTupleComparator
 
 import cPickle as pickle
@@ -350,13 +351,13 @@ def get_reported_comments(sr_id):
 def get_reported(sr):
     if isinstance(sr, ModContribSR):
         srs = Subreddit._byID(sr.sr_ids, return_dict=False)
-        results = []
-        results.extend(get_reported_links(sr) for sr in srs)
-        results.extend(get_reported_comments(sr) for sr in srs)
-        return merge_results(*results)
+        q = []
+        q.extend(get_reported_links(sr) for sr in srs)
+        q.extend(get_reported_comments(sr) for sr in srs)
+        return MergedCachedQuery(*q)
     else:
-        return merge_results(get_reported_links(sr),
-                             get_reported_comments(sr))
+        return MergedCachedQuery(get_reported_links(sr),
+                                 get_reported_comments(sr))
 
 # TODO: Wow, what a hack. I'm doing this in a hurry to make
 # /r/blah/about/trials and /r/blah/about/modqueue work. At some point
@@ -407,20 +408,20 @@ def get_trials(sr):
         return get_trials_links(sr)
 
 def get_modqueue(sr):
-    results = []
+    q = []
     if isinstance(sr, ModContribSR):
         srs = Subreddit._byID(sr.sr_ids, return_dict=False)
 
         for sr in srs:
-            results.append(get_reported_links(sr))
-            results.append(get_reported_comments(sr))
-            results.append(get_spam_filtered_links(sr))
+            q.append(get_reported_links(sr))
+            q.append(get_reported_comments(sr))
+            q.append(get_spam_filtered_links(sr))
     else:
-        results.append(get_reported_links(sr))
-        results.append(get_reported_comments(sr))
-        results.append(get_spam_filtered_links(sr))
+        q.append(get_reported_links(sr))
+        q.append(get_reported_comments(sr))
+        q.append(get_spam_filtered_links(sr))
 
-    return merge_results(*results)
+    return MergedCachedQuery(*results)
 
 def get_domain_links_old(domain, sort, time):
     return DomainSearchQuery(domain, sort=search_sort[sort], timerange=time)
@@ -840,6 +841,7 @@ def del_or_ban(things, why):
             if why == "del":
                 with CachedQueryMutator() as m:
                     m.delete(get_spam_filtered_links(sr), links)
+                    m.delete(get_reported_links(sr), links)
 
         if comments:
             add_queries([get_spam_comments(sr)], insert_items = comments)
@@ -893,26 +895,32 @@ def unban(things):
 def new_report(thing):
     if isinstance(thing, Link):
         sr = Subreddit._byID(thing.sr_id)
-        add_queries([get_reported_links(sr)], insert_items = thing)
+        q = get_reported_links(sr)
     elif isinstance(thing, Comment):
         sr = Subreddit._byID(thing.sr_id)
-        add_queries([get_reported_comments(sr)], insert_items = thing)
+        q = get_reported_comments(sr)
+    else:
+        return
+
+    with CachedQueryMutator() as m:
+            m.insert(q, thing)
 
 def clear_reports(things):
     by_srid, srs = _by_srid(things)
     if not by_srid:
         return
 
-    for sr_id, sr_things in by_srid.iteritems():
+    with CachedQueryMutator() as m:
+        for sr_id, sr_things in by_srid.iteritems():
         sr = srs[sr_id]
 
         links = [ x for x in sr_things if isinstance(x, Link) ]
         comments = [ x for x in sr_things if isinstance(x, Comment) ]
 
         if links:
-            add_queries([get_reported_links(sr)], delete_items = links)
+            m.delete(get_reported_links(sr), links)
         if comments:
-            add_queries([get_reported_comments(sr)], delete_items = comments)
+            m.delete(get_reported_comments(sr), comments)
 
 def new_spam_filtered_links(things):
     by_srid, srs = _by_srid(things)
