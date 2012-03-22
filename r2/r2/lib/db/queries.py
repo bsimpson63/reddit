@@ -912,15 +912,15 @@ def clear_reports(things):
 
     with CachedQueryMutator() as m:
         for sr_id, sr_things in by_srid.iteritems():
-        sr = srs[sr_id]
+            sr = srs[sr_id]
 
-        links = [ x for x in sr_things if isinstance(x, Link) ]
-        comments = [ x for x in sr_things if isinstance(x, Comment) ]
+            links = [ x for x in sr_things if isinstance(x, Link) ]
+            comments = [ x for x in sr_things if isinstance(x, Comment) ]
 
-        if links:
-            m.delete(get_reported_links(sr), links)
-        if comments:
-            m.delete(get_reported_comments(sr), comments)
+            if links:
+                m.delete(get_reported_links(sr), links)
+            if comments:
+                m.delete(get_reported_comments(sr), comments)
 
 def new_spam_filtered_links(things):
     by_srid, srs = _by_srid(things)
