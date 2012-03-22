@@ -408,14 +408,12 @@ def get_modqueue(sr):
     results = []
     if isinstance(sr, ModContribSR):
         srs = Subreddit._byID(sr.sr_ids, return_dict=False)
-        results.append(get_trials_links(srs))
 
         for sr in srs:
             results.append(get_reported_links(sr))
             results.append(get_reported_comments(sr))
             results.append(get_spam_filtered_links(sr))
     else:
-        results.append(get_trials_links(sr))
         results.append(get_reported_links(sr))
         results.append(get_reported_comments(sr))
         results.append(get_spam_filtered_links(sr))
