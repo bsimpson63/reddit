@@ -8,7 +8,8 @@ from r2.lib import utils
 from r2.lib.solrsearch import DomainSearchQuery
 from r2.lib import amqp, sup, filters
 from r2.lib.comment_tree import add_comments, update_comment_votes
-from r2.models.query_cache import cached_query, merged_cached_query, UserQueryCache, CachedQueryMutator
+from r2.models.query_cache import cached_query, merged_cached_query, \
+    UserQueryCache, SubredditQueryCache, CachedQueryMutator
 from r2.models.query_cache import ThingTupleComparator
 
 import cPickle as pickle
@@ -322,10 +323,10 @@ def get_spam(sr):
                              get_spam_comments(sr))
 
 @cached_query(SubredditQueryCache)
-def get_spam_filtered_links(sr):
+def get_spam_filtered_links(sr_id):
     """ NOTE: This query will never run unless someone does an "update" on it,
         but that will probably timeout. Use insert_spam_filtered_links."""
-    return Link._query(Link.c.sr_id == sr._id,
+    return Link._query(Link.c.sr_id == sr_id,
                        Link.c._spam == True,
                        Link.c.verdict != 'mod-removed',
                        sort = db_sort('new'))
@@ -917,15 +918,16 @@ def new_spam_filtered_links(things):
     if not by_srid:
         return
 
-    for sr_id, sr_things in by_srid.iteritems():
-        sr = srs[sr_id]
-        links = [ x for x in sr_things if isinstance(x, Link) ]
-        insert_items = set([l for l in links \
-                            if l._spam and \
-                               getattr(l, 'verdict', None) != 'mod-removed'])
-        delete_items = set(links) - insert_items
-        add_queries([get_spam_filtered_links(sr)], insert_items=insert_items,
-                    delete_items=delete_items)
+    with CachedQueryMutator() as m:
+        for sr_id, sr_things in by_srid.iteritems():
+            sr = srs[sr_id]
+            links = [ x for x in sr_things if isinstance(x, Link) ]
+            insert_items = set([l for l in links \
+                                if l._spam and \
+                                   getattr(l, 'verdict', None) != 'mod-removed'])
+            delete_items = set(links) - insert_items
+            m.insert(get_spam_filtered_links(sr), insert_items)
+            m.delete(get_spam_filtered_links(sr), delete_items)
 
 def find_spam_filtered_links(sr):
     """ Identify spam filtered links - those that are spam but don't have
@@ -939,9 +941,8 @@ def find_spam_filtered_links(sr):
 
 def set_spam_filtered_links(sr):
     filtered = find_spam_filtered_links(sr)
-    #with CachedQueryMutator() as m:
-    #    m.insert(get_spam_filtered_links(sr), filtered)
-    add_queries([get_spam_filtered_links(sr)], insert_items=filtered)
+    with CachedQueryMutator() as m:
+        m.insert(get_spam_filtered_links(sr), filtered)
 
 def populate_spam_filtered_links():
     q = Subreddit._query(sort = asc('_date'))
