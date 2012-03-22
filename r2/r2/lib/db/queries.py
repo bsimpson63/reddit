@@ -333,19 +333,19 @@ def get_spam_filtered_links(sr_id):
                        Link.c.verdict != 'mod-removed',
                        sort = db_sort('new'))
 
-def get_reported_links(sr):
-    q_l = Link._query(Link.c.reported != 0,
-                      Link.c.sr_id == sr._id,
-                      Link.c._spam == False,
-                      sort = db_sort('new'))
-    return make_results(q_l)
+@cached_query(SubredditQueryCache)
+def get_reported_links(sr_id):
+    return Link._query(Link.c.reported != 0,
+                       Link.c.sr_id == sr_id,
+                       Link.c._spam == False,
+                       sort = db_sort('new'))
 
-def get_reported_comments(sr):
-    q_c = Comment._query(Comment.c.reported != 0,
-                         Comment.c.sr_id == sr._id,
-                         Comment.c._spam == False,
-                         sort = db_sort('new'))
-    return make_results(q_c)
+@cached_query(SubredditQueryCache)
+def get_reported_comments(sr_id):
+    return Comment._query(Comment.c.reported != 0,
+                          Comment.c.sr_id == sr_id,
+                          Comment.c._spam == False,
+                          sort = db_sort('new'))
 
 def get_reported(sr):
     if isinstance(sr, ModContribSR):
@@ -912,7 +912,7 @@ def clear_reports(things):
 
 # Items should be in the filter list if:
 # they are spam and verdict != 'mod-removed'
-# What to do with shit that gets deleted?
+# What to do with shit that gets deleted? - remove in del_or_ban!
 def new_spam_filtered_links(things):
     by_srid, srs = _by_srid(things)
     if not by_srid:
@@ -949,6 +949,13 @@ def populate_spam_filtered_links():
     for sr in fetch_things2(q):
         print 'Processing %s' % sr.name
         set_spam_filtered_links(sr)
+
+def populate_reports():
+    q = Subreddit._query(sort = asc('_date'))
+    for sr in fetch_things2(q):
+        print 'Processing %s' % sr.name
+        get_reported_links(sr).update()
+        get_reported_comments(sr).update()
 
 def add_all_ban_report_srs():
     """Adds the initial spam/reported pages to the report queue"""
