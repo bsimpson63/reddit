@@ -922,9 +922,8 @@ def new_spam_filtered_links(things):
         for sr_id, sr_things in by_srid.iteritems():
             sr = srs[sr_id]
             links = [ x for x in sr_things if isinstance(x, Link) ]
-            insert_items = set([l for l in links \
-                                if l._spam and \
-                                   getattr(l, 'verdict', None) != 'mod-removed'])
+            insert_items = set([l for l in links if l._spam and
+                                getattr(l, 'verdict', None) != 'mod-removed'])
             delete_items = set(links) - insert_items
             m.insert(get_spam_filtered_links(sr), insert_items)
             m.delete(get_spam_filtered_links(sr), delete_items)
@@ -934,8 +933,7 @@ def find_spam_filtered_links(sr):
         verdict set as 'mod-removed' (this happens in end_trial)."""
     fullnames = get_spam_links(sr)
     links = Thing._by_fullname(fullnames, data=True, return_dict=False)
-    filtered = [l for l in links \
-                if l._spam and not l._deleted and \
+    filtered = [l for l in links if l._spam and not l._deleted and
                 getattr(l, 'verdict', None) != 'mod-removed']
     return filtered
 
