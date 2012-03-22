@@ -942,13 +942,6 @@ def new_spam_filtered_links(things):
             m.insert(get_spam_filtered_links(sr), insert_items)
             m.delete(get_spam_filtered_links(sr), delete_items)
 
-def populate_reports():
-    q = Subreddit._query(sort = asc('_date'))
-    for sr in fetch_things2(q):
-        print 'Processing %s' % sr.name
-        get_reported_links(sr).update()
-        get_reported_comments(sr).update()
-
 def add_all_ban_report_srs():
     """Adds the initial spam/reported pages to the report queue"""
     q = Subreddit._query(sort = asc('_date'))
