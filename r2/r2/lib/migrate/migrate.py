@@ -397,3 +397,22 @@ def convert_query_cache_to_json():
                 out[ckey] = json.dumps(raw)
             m.insert(key, out)
 
+def find_spam_filtered_links(sr):
+    """ Identify spam filtered links - those that are spam but don't have
+        verdict set as 'mod-removed' (this happens in end_trial)."""
+    fullnames = get_spam_links(sr)
+    links = Thing._by_fullname(fullnames, data=True, return_dict=False)
+    filtered = [l for l in links if l._spam and not l._deleted and
+                getattr(l, 'verdict', None) != 'mod-removed']
+    return filtered
+
+def set_spam_filtered_links(sr):
+    filtered = find_spam_filtered_links(sr)
+    with CachedQueryMutator() as m:
+        m.insert(get_spam_filtered_links(sr), filtered)
+
+def populate_spam_filtered_links():
+    q = Subreddit._query(sort = asc('_date'))
+    for sr in fetch_things2(q):
+        print 'Processing %s' % sr.name
+        set_spam_filtered_links(sr)
