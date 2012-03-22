@@ -837,6 +837,10 @@ def del_or_ban(things, why):
 
             add_queries(results, delete_items = links)
 
+            if why == "del":
+                with CachedQueryMutator() as m:
+                    m.delete(get_spam_filtered_links(sr), links)
+
         if comments:
             add_queries([get_spam_comments(sr)], insert_items = comments)
             add_queries([get_all_comments(),
@@ -910,9 +914,6 @@ def clear_reports(things):
         if comments:
             add_queries([get_reported_comments(sr)], delete_items = comments)
 
-# Items should be in the filter list if:
-# they are spam and verdict != 'mod-removed'
-# What to do with shit that gets deleted? - remove in del_or_ban!
 def new_spam_filtered_links(things):
     by_srid, srs = _by_srid(things)
     if not by_srid:
