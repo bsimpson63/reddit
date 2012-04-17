@@ -1281,7 +1281,7 @@ class View(ThingBase):
         # can we be smarter here?
         thing_cache.delete(cls._cache_key_id(row_key))
 
-class StorageView(View):
+class DenormalizedView(View):
     """Store the entire underlying object inside the View column."""
 
     # Do we need to check for _dirty?
