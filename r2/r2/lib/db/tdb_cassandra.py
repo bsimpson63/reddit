@@ -1315,7 +1315,14 @@ class DenormalizedView(View):
         # Decode date props
         for attr, val in serialized_columns.items():
             if cls.is_date_prop(attr):
-                serialized_columns[attr] = base64.b64decode(val)
+                # Old style dates are seconds since epoch as str
+                # New style dates are base64 encoded binary
+                # Might be a datetime somehow?
+                if not isinstance(val, datetime):
+                    try:
+                        float(val)
+                    except ValueError:
+                        serialized_columns[attr] = base64.b64decode(val)
 
         obj = cls._view_of._from_serialized_columns(_id, serialized_columns)
         return obj
