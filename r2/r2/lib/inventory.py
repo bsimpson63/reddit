@@ -22,20 +22,32 @@
 
 
 from collections import OrderedDict
-from datetime import datetime, timedelta
+import datetime
+import math
 import re
 
 from pylons import g
 from sqlalchemy import func
 
+from r2.lib.utils import to_date
 from r2.models import traffic
 from r2.models.promo_metrics import PromoMetrics
 from r2.models.subreddit import DefaultSR
+from r2.models.bidding import PromotionWeights
+from r2.models.promo import PromoCampaign, NO_TRANSACTION
+
 
 NDAYS_TO_QUERY = 14  # how much history to use in the estimate
 MIN_DAILY_CASS_KEY = 'min_daily_pageviews.GET_listing'
 PAGEVIEWS_REGEXP = re.compile('(.*)-GET_listing')
 
+
+def impressions_from_bid(bid):
+    impressions = bid / (g.CPM_PENNIES / 100.) * 1000
+    return int(impressions)
+
+
+# Precomputing
 def get_predicted_by_date(sr_name, start, stop=None):
     """Return dict mapping datetime objects to predicted pageviews."""
     if not sr_name:
@@ -46,35 +58,131 @@ def get_predicted_by_date(sr_name, start, stop=None):
     ndays = (stop - start).days if stop else 1  # default is one day
     predicted = OrderedDict()
     for i in range(ndays):
-        date = start + timedelta(i)
+        date = start + datetime.timedelta(i)
         predicted[date] = min_daily
     return predicted
 
 
 def update_prediction_data():
     """Fetch prediction data and write it to cassandra."""
-    min_daily_by_sr = _min_daily_pageviews_by_sr(NDAYS_TO_QUERY)
+    min_daily_by_sr = all_min_daily_pageviews(NDAYS_TO_QUERY)
     PromoMetrics.set(MIN_DAILY_CASS_KEY, min_daily_by_sr)
 
-
-def _min_daily_pageviews_by_sr(ndays=NDAYS_TO_QUERY, end_date=None):
-    """Return dict mapping sr_name to min_pageviews over the last ndays."""
+def all_min_daily_pageviews(ndays=NDAYS_TO_QUERY, end_date=None):
     if not end_date:
-        end_date = datetime.now()
-    stop = end_date.date()
-    start = stop - timedelta(ndays)
+        end_date = datetime.datetime.now() - datetime.timedelta(days=1)   # notice that we can't use g.tz
+
+    end_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_date = end_date - datetime.timedelta(days=ndays)
+    time_points = traffic.get_time_points('day', start_date, end_date)
     cls = traffic.PageviewsBySubredditAndPath
+
     q = (traffic.Session.query(cls.srpath, func.min(cls.pageview_count))
                                .filter(cls.interval == 'day')
-                               .filter(cls.date >= start)
-                               .filter(cls.date < stop)
+                               .filter(cls.date.in_(time_points))
                                .filter(cls.srpath.like('%-GET_listing'))
                                .group_by(cls.srpath))
 
-    # row looks like: ('lightpainting-GET_listing', 16)
     retval = {}
     for row in q:
         m = PAGEVIEWS_REGEXP.match(row[0])
         if m:
             retval[m.group(1)] = row[1]
     return retval
+
+# Direct querying
+def get_scheduled_pageviews(sr_name, dates):
+    # PromotionWeights uses sr_name '' to indicate front page
+    if sr_name == DefaultSR.name.lower():
+        sr_name = ''
+
+    q = (PromotionWeights.query()
+                .filter(PromotionWeights.sr_name == sr_name)
+                .filter(PromotionWeights.date.in_(dates)))
+    promo_weights = list(q)
+    campaigns = PromoCampaign._byID([pw.promo_idx for pw in promo_weights],
+                                    data=True, return_dict=True)
+
+    r = dict.fromkeys(dates, 0)
+    for pw in promo_weights:
+        paid = campaigns[pw.promo_idx].trans_id != NO_TRANSACTION
+        if not paid:
+            continue
+
+        bid = pw.bid
+        pageviews = impressions_from_bid(bid)
+        r[pw.date] += pageviews
+    return r
+
+
+def get_predicted_pageviews(sr_name, dates):
+    """Make a conservative estimate of future pageviews
+
+    In the future can base this off running average and day of the week. For
+    now just return the minimum pageviews from last 14 days.
+
+    """
+
+    min_pageviews = min_daily_pageviews_by_sr(sr_name, ndays=14)
+    return dict.fromkeys(dates, min_pageviews)
+
+
+def min_daily_pageviews_by_sr(sr_name, ndays=NDAYS_TO_QUERY):
+    """Return minimum pageviews for sr over the last ndays."""
+
+    if not sr_name:
+        sr_name = DefaultSR.name
+
+    last_modified = traffic.get_traffic_last_modified()
+    end_date = last_modified - datetime.timedelta(days=1)
+    end_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_date = end_date - datetime.timedelta(days=ndays)
+    time_points = traffic.get_time_points('day', start_date, end_date)
+    cls = traffic.PageviewsBySubredditAndPath
+    q = (traffic.Session.query(cls.srpath, func.min(cls.pageview_count))
+                               .filter(cls.interval == 'day')
+                               .filter(cls.date.in_(time_points))
+                               .filter(cls.srpath == '%s-GET_listing' % sr_name)
+                               .group_by(cls.srpath))
+    r = list(q)
+    if not r:
+        raise ValueError('No traffic for %s' % sr.name)
+    elif len(r) != 1:
+        raise ValueError('Got weird traffic result for %s: %s' % (sr.name, r))
+    else:
+        return r[0][1]
+
+
+# Interfaces
+def fuzz_impressions(imps, multiple=500):
+    """Return imps rounded down to nearest multiple."""
+    if imps > 0:
+        return int(multiple * math.floor(float(imps) / multiple))
+    else:
+        return 0
+
+
+def get_available_impressions(sr_name, start_date, end_date, fuzzed=False):
+    start_date, end_date = to_date(start_date), to_date(end_date)
+    dates = [start_date + datetime.timedelta(i)
+             for i in xrange((end_date - start_date).days)]
+
+    scheduled = get_scheduled_pageviews(sr_name, dates)
+    total = get_predicted_pageviews(sr_name, dates)
+    available = {}
+    for d in dates:
+        if fuzzed:
+            available[d] = fuzz_impressions(total[d] - scheduled[d])
+        else:
+            available[d] = total[d] - scheduled[d]
+    return available
+
+
+def get_oversold_dates(sr_name, bid, start_date, end_date):
+    start_date, end_date = to_date(start_date), to_date(end_date)
+    duration = max((end_date - start_date).days, 1)
+    requested_per_day = impressions_from_bid(bid / duration)
+    available = get_available_impressions(sr_name, start_date, end_date)
+    oversold = [d for d, avail in available.items()
+                if avail < requested_per_day]
+    return oversold

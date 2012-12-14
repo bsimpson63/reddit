@@ -28,7 +28,7 @@ from pylons import c, g, request
 from pylons.i18n import _
 
 from r2.controllers.listingcontroller import ListingController
-from r2.lib import cssfilter, promote
+from r2.lib import cssfilter, inventory, promote
 from r2.lib.authorize import get_account_info, edit_profile, PROFILE_LIMIT
 from r2.lib.db import queries
 from r2.lib.errors import errors
@@ -210,16 +210,16 @@ class PromoteController(ListingController):
         '''
         inv_start_date = start or promote.promo_datetime_now()
         inv_end_date = end or (inv_start_date + timedelta(30))
-        inventory = promote.get_available_impressions(
+        available = inventory.get_available_impressions(
             sr_name,
             inv_start_date,
             inv_end_date,
-            fuzzed=(not c.user_is_admin)
+            fuzzed=True,
         )
         dates = []
         impressions = []
         max_imps = 0
-        for date, imps in inventory.iteritems():
+        for date, imps in available.iteritems():
             dates.append(date.strftime("%m/%d/%Y"))
             impressions.append(imps)
             max_imps = max(max_imps, imps)

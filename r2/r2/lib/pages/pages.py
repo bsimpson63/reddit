@@ -58,6 +58,7 @@ from r2.lib.log import log_text
 from r2.lib.memoize import memoize
 from r2.lib.utils import trunc_string as _truncate, to_date
 from r2.lib.filters import safemarkdown
+from r2.lib import inventory
 
 import sys, random, datetime, calendar, simplejson, re, time
 import time
