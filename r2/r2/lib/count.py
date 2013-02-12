@@ -46,6 +46,7 @@ def get_sr_counts():
     return dict((sr._fullname, sr._ups) for sr in srs)
 
 try:
-    from r2admin.lib.count import *
+    #from r2admin.lib.count import *
+    pass
 except ImportError:
     pass
