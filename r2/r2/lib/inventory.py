@@ -130,27 +130,7 @@ def get_predicted_pageviews(sr_name, dates):
 def min_daily_pageviews_by_sr(sr_name, ndays=NDAYS_TO_QUERY):
     """Return minimum pageviews for sr over the last ndays."""
 
-    if not sr_name:
-        sr_name = DefaultSR.name
-
-    last_modified = traffic.get_traffic_last_modified()
-    end_date = last_modified - datetime.timedelta(days=1)
-    end_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
-    start_date = end_date - datetime.timedelta(days=ndays)
-    time_points = traffic.get_time_points('day', start_date, end_date)
-    cls = traffic.PageviewsBySubredditAndPath
-    q = (traffic.Session.query(cls.srpath, func.min(cls.pageview_count))
-                               .filter(cls.interval == 'day')
-                               .filter(cls.date.in_(time_points))
-                               .filter(cls.srpath == '%s-GET_listing' % sr_name)
-                               .group_by(cls.srpath))
-    r = list(q)
-    if not r:
-        raise ValueError('No traffic for %s' % sr.name)
-    elif len(r) != 1:
-        raise ValueError('Got weird traffic result for %s: %s' % (sr.name, r))
-    else:
-        return r[0][1]
+    return 10000
 
 
 # Interfaces
