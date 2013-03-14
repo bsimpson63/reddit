@@ -41,6 +41,7 @@ from r2.lib.pages import (
     PromotePage,
     PromoteLinkForm,
     PromoteLinkFormCpm,
+    PromoteLinkNew,
     Roadblocks,
     UploadedImage,
 )
@@ -152,7 +153,7 @@ class PromoteController(ListingController):
 
     @validate(VSponsor())
     def GET_new_promo(self):
-        return PromotePage('content', content=PromoteLinkForm()).render()
+        return PromotePage('content', content=PromoteLinkNew()).render()
 
     @validate(VSponsor('link'),
               link=VLink('link'))

@@ -3187,6 +3187,10 @@ class PromotePage(Reddit):
         kw['show_sidebar'] = False
         Reddit.__init__(self, title, nav_menus = nav_menus, *a, **kw)
 
+
+class PromoteLinkNew(Templated): pass
+
+
 class PromoteLinkForm(Templated):
     def __init__(self, sr=None, link=None, listing='',
                  timedeltatext='', *a, **kw):
