@@ -50,7 +50,7 @@ from r2.lib.menus import OffsiteButton, menu, JsNavMenu
 from r2.lib.strings import plurals, rand_strings, strings, Score
 from r2.lib.utils import title_to_url, query_string, UrlParser, vote_hash
 from r2.lib.utils import url_links_builder, make_offset_date, median, to36
-from r2.lib.utils import trunc_time, timesince, timeuntil, weighted_lottery
+from r2.lib.utils import trunc_time, timesince, timeuntil, weighted_lottery, Storage
 from r2.lib.template_helpers import add_sr, get_domain, format_number
 from r2.lib.subreddit_search import popular_searches
 from r2.lib.scraper import get_media_embed
@@ -3192,28 +3192,17 @@ class PromoteLinkNew(Templated): pass
 
 
 class PromoteLinkForm(Templated):
-    def __init__(self, sr=None, link=None, listing='',
-                 timedeltatext='', *a, **kw):
-        self.setup(sr, link, listing, timedeltatext, *a, **kw)
-        Templated.__init__(self, sr=sr, datefmt = datefmt,
-                           timedeltatext=timedeltatext, listing = listing,
-                           bids = self.bids, *a, **kw)
+    def __init__(self, link, listing):
+        self.setup(link, listing)
+        Templated.__init__(self)
 
-    def setup(self, sr, link, listing, timedeltatext, *a, **kw):
-        bids = []
-        if c.user_is_sponsor and link:
-            self.author = Account._byID(link.author_id)
-            try:
-                bids = bidding.Bid.lookup(thing_id = link._id)
-                bids.sort(key = lambda x: x.date, reverse = True)
-            except NotFound:
-                pass
+    def setup(self, link, listing):
+        self.listing = listing
 
         # reference "now" to what we use for promtions
         now = promote.promo_datetime_now()
 
         # min date is the day before the first possible start date.
-        self.promote_date_today = now
         mindate = make_offset_date(now, g.min_promote_future,
                                   business_days=True)
         mindate -= datetime.timedelta(1)
@@ -3224,32 +3213,79 @@ class PromoteLinkForm(Templated):
         self.startdate = startdate.strftime("%m/%d/%Y")
         self.enddate = enddate.strftime("%m/%d/%Y")
 
-        self.mindate = mindate.strftime("%m/%d/%Y")
+        if c.user_is_sponsor:
+            self.mindate = now.strftime('%m/%d/%Y')
+        else:
+            self.mindate = self.startdate
 
-        self.link = None
-        if link:
-            self.sr_searches = simplejson.dumps(popular_searches())
-            self.subreddits = (Subreddit.submit_sr_names(c.user) or
-                               Subreddit.submit_sr_names(None))
-            self.default_sr = (self.subreddits[0] if self.subreddits
-                               else g.default_sr)
-            self.link = promote.wrap_promoted(link)
-            campaigns = PromoCampaign._by_link(link._id)
-            self.campaigns = promote.get_renderable_campaigns(link, campaigns)
-            self.promotion_log = PromotionLog.get(link)
+        self.sr_searches = simplejson.dumps(popular_searches())
+        self.subreddits = (Subreddit.submit_sr_names(c.user) or
+                           Subreddit.submit_sr_names(None))
+        self.default_sr = (self.subreddits[0] if self.subreddits
+                           else g.default_sr)
+        self.link = promote.wrap_promoted(link)
+        campaigns = PromoCampaign._by_link(link._id)
+        self.campaigns = promote.get_renderable_campaigns(link, campaigns)
+        self.promotion_log = PromotionLog.get(link)
 
-        if not c.user_is_sponsor:
-            self.now = promote.promo_datetime_now().date()
-            start_date = promote.promo_datetime_now(offset=-14).date()
-            end_date = promote.promo_datetime_now(offset=14).date()
+        #right panel content
+        if c.user_is_sponsor:
+            self.author = Account._byID(link.author_id)
+            try:
+                bids = bidding.Bid.lookup(thing_id = link._id)
+            except NotFound:
+                self.bids = []
+            else:
+                bidders = Account._byID([bid.account_id for bid in bids],
+                                        return_dict=True, data=True)
+                for bid in bids:
+                    status = bidding.Bid.STATUS.name[bid.status].lower()
+                    bidder = bidders[bid.account_id]
+                    row = Storage(
+                        status=status,
+                        bidder=bidder.name,
+                        date=bid.date,
+                        transaction=bid.transaction,
+                        campaign=bid.campaign,
+                        pay_id=bid.pay_id,
+                        amount_str='$%.2f' % bid.bid,
+                    )
+                    self.bids.append(row)
+        else:
+            promo_traffic = dict(promote.traffic_totals())
+            promo_start = promote.promo_datetime_now(offset=-14).date()
+            promo_end = promote.promo_datetime_now(offset=14).date()
+            market, promo_counter = Promote_Graph.get_market(None, promo_start,
+                                                             promo_end)
+            max_promo_count = max(promo_counter.values() or [1])
+            self.history_table = []
 
-            self.promo_traffic = dict(promote.traffic_totals())
-            self.market, self.promo_counter = \
-                Promote_Graph.get_market(None, start_date, end_date)
+            for i in xrange(0, 28):
+                the_future = (i >= 14)
+                day = (now.date() + datetime.timedelta(i-14))
+                promo_count = promo_counter.get(i, 0)
+                cpm = cpc = imp_traffic = cli_traffic = "---"
 
-        self.bids = bids
+                if promo_traffic.has_key(day):
+                    imp_traffic, cli_traffic = promo_traffic[day]
+                    if market.has_key(i) and not the_future:
+                        cpm = "$%.2f" % (market[i] * 1000./max(imp_traffic, 1))
+                        cpc = "$%.2f" % (market[i] * 1./max(cli_traffic, 1))
+
+                row = Storage(
+                    day=day.strftime("%m/%d/%Y"),
+                    today=(i == 14),
+                    cpm=cpm,
+                    cpc=cpc,
+                    promo_count=promo_count,
+                    width=int(50. * promo_count / max_promo_count),
+                )
+                self.history_table.append(row)
+
         self.min_daily_bid = 0 if c.user_is_admin else g.min_promote_bid
-
+        self.user_is_trusted = c.user_is_sponsor or c.user.trusted_sponsor
+        self.editable = (c.user_is_sponsor or c.user.trusted_sponsor
+                         or not promote.is_promoted(link))
 
 class PromoteLinkFormCpm(PromoteLinkForm):
     def __init__(self, sr=None, link=None, listing='',

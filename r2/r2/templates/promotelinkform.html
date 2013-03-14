@@ -21,18 +21,12 @@
 ###############################################################################
 
 <%!
-  from r2.lib.utils import to36
-  from r2.lib.media import thumbnail_url
-  from r2.lib.template_helpers import static
-  from r2.lib import promote
-  from r2.lib.strings import strings
-  from r2.models import Account
   from r2.lib import js
   import simplejson
 %>
 
 <%namespace file="utils.html" 
-            import="error_field, checkbox, image_upload, reddit_selector" />
+            import="error_field, checkbox, reddit_selector" />
 <%namespace name="utils" file="utils.html"/>
 
 ${unsafe(js.use('sponsored'))}
@@ -54,20 +48,20 @@ ${self.javascript_setup()}
     ${self.campaign_dashboard()}
 
     <div class="pretty-form" id="promo-form">
-      <input type="hidden" name="link_id" value="${to36(thing.link._id)}"/>
-      ${self.title_field(editable=c.user_is_sponsor or c.user.trusted_sponsor or not promote.is_promoted(thing.link), title=thing.link.title)}
-      ${self.url_field(editable=c.user_is_sponsor or c.user.trusted_sponsor or not promote.is_promoted(thing.link),
+      <input type="hidden" name="link_id" value="${thing.link._id36}"/>
+      ${self.title_field(editable=thing.editable, title=thing.link.title)}
+      ${self.url_field(editable=thing.editable,
                        url=thing.link.url,
                        domain_override=c.user_is_sponsor,
                        existing_override=getattr(thing.link, "domain_override", ''))}
 
-      %if c.user_is_sponsor or c.user.trusted_sponsor or not promote.is_promoted(thing.link):
+      %if thing.editable:
         ${self.image_field()}
         ${self.options_field(set_maxes=c.user_is_sponsor)}
+      %endif
 
-        %if c.user_is_sponsor or c.user.trusted_sponsor:
-          ${self.media_field()}
-        %endif
+      %if thing.user_is_trusted:
+        ${self.media_field()}
       %endif
 
       <div class="save-button">
@@ -278,7 +272,7 @@ ${self.javascript_setup()}
            class="campaign infotext rounded"
            method="post" action="/api/add_campaign">
 
-        <input type="hidden" name="link_id" value="${to36(thing.link._id)}"/>
+        <input type="hidden" name="link_id" value="${thing.link._id36}"/>
 
         <%
             start_title = "Date when your sponsored link will start running.  We start new campaigns at midnight UTC+5"
@@ -291,12 +285,7 @@ ${self.javascript_setup()}
           <tr>
             <th>duration</th>
             <td class="prefright">
-              <%
-                  mindate = thing.startdate
-                  if c.user_is_sponsor:
-                      mindate = thing.promote_date_today.strftime('%m/%d/%Y')
-               %>
-              <input type="hidden" id="date-min" name="date-min" value="${mindate}" />
+              <input type="hidden" id="date-min" name="date-min" value="${thing.mindate}" />
               <%self:datepicker name="startdate", value="${thing.startdate}"
                                 minDateSrc="date-min" initfuncname="init_startdate">
                 function(elem) {
@@ -460,11 +449,6 @@ ${self.javascript_setup()}
 <%def name="user_right_panel()">
   <div class="bidding-history" style="padding-top: 0px;">
     <%utils:line_field title="${_('promotion history')}" css_class="rounded">
-
-      <%
-          pc_max = max(thing.promo_counter.values() or [1])
-       %>
-
       <p style="font-size:smaller; margin: 5px;">
         Here is a summary of the data presented on the&#32;<a href="/promoted/graph">graph page</a>.
         Remember: best to pick days with less competition.
@@ -479,29 +463,17 @@ ${self.javascript_setup()}
           <th></th>
         </tr>
 
-        %for i in xrange(0, 28):
-          <%
-             import datetime
-             is_today = (i == 14)
-             the_future = (i >= 14)
-             day = (thing.now + datetime.timedelta(i-14))
-             CPC = CPM = imp_traffic = cli_traffic = "---"
-             if thing.promo_traffic.has_key(day):
-                imp_traffic, cli_traffic = thing.promo_traffic[day]
-                if thing.market.has_key(i) and not the_future:
-                   CPM = "$%.2f" % (thing.market[i] * 1000./max(imp_traffic, 1))
-                   CPC = "$%.2f" % (thing.market[i] * 1./max(cli_traffic, 1))
-           %>
+        %for row in thing.history_table:
           <tr>
             <th>
-              ${unsafe("&raquo;" if is_today else '')}
-              ${day.strftime("%m/%d/%Y")}
+              ${unsafe("&raquo;" if row.today else '')}
+              ${row.day}
             </th>
-            <td>${CPM}</td>
-            <td>${CPC}</td>
-            <td>${thing.promo_counter.get(i, 0)}</td>
+            <td>${row.cpm}</td>
+            <td>${row.cpc}</td>
+            <td>${row.promo_count}</td>
             <td>
-              <div class="graph" style="width:${int(50. * thing.promo_counter.get(i, 0) / pc_max)}px"></div>
+              <div class="graph" style="width:${row.width}px"></div>
             </td>
           </tr>
         %endfor
@@ -514,12 +486,6 @@ ${self.javascript_setup()}
   <div class="spacer bidding-history">
     %if thing.bids:
       <%utils:line_field title="${_('bidding history')}" css_class="rounded">
-
-        <%
-            from r2.models import Account, bidding
-            accounts = Account._byID(set(x.account_id for x in thing.bids), True)
-         %>
-
         <table class="bid-table">
           <tr>
             <th>date</th>
@@ -531,17 +497,14 @@ ${self.javascript_setup()}
             <th>status</th>
           </tr>
           %for bid in thing.bids:
-            <%
-                status = bidding.Bid.STATUS.name[bid.status].lower()
-             %>
             <tr class="bid-${status}">
               <td>${bid.date}</td>
-              <td>${accounts[bid.account_id].name}</td>
+              <td>${bid.bidder}</td>
               <td>${bid.transaction}</td>
               <td>${bid.campaign}</td>
               <td>${bid.pay_id}</td>
-              <td>$${"%.2f" % bid.bid}</td>
-              <td class="bid-status">${status}</td>
+              <td>${bid.amount_str}</td>
+              <td class="bid-status">${bid.status}</td>
             </tr>
           %endfor
         </table>

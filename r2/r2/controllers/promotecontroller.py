@@ -163,9 +163,7 @@ class PromoteController(ListingController):
         rendered = wrap_links(link, wrapper=promote.sponsor_wrapper,
                               skip=False)
 
-        form = PromoteLinkForm(link=link,
-                               listing=rendered,
-                               timedeltatext="")
+        form = PromoteLinkForm(link, rendered)
 
         page = PromotePage('new_promo', content=form)
 
