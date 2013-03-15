@@ -558,8 +558,7 @@ def accepted_campaigns(offset=0):
             accepted_links[link._id] = link
 
     accepted_link_ids = accepted_links.keys()
-    campaign_query = PromoCampaign._query(PromoCampaign.c.link_id == accepted_link_ids,
-                                          data=True)
+    campaign_query = PromoCampaign._by_link(accepted_link_ids)
     campaigns = dict((camp._id, camp) for camp in campaign_query)
     for pw in promo_weights:
         campaign = campaigns.get(pw.promo_idx)
