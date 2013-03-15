@@ -220,12 +220,15 @@ class PromoteController(ListingController):
             return content.as_csv()
         return PromotePage("admingraph", content=content).render()
 
-    def GET_inventory(self, sr_name):
+    @validate(sr_name=nop('sr_name'),
+              start=VDate('start', format='%Y%m%d%H'),
+              end=VDate('end', format='%Y%m%d%H'))
+    def GET_inventory(self, sr_name, start, end):
         '''
         Return available inventory data as json for use in ajax calls
         '''
-        inv_start_date = promote.promo_datetime_now()
-        inv_end_date = inv_start_date + timedelta(60)
+        inv_start_date = start or promote.promo_datetime_now()
+        inv_end_date = end or (inv_start_date + timedelta(30))
         inventory = promote.get_available_impressions(
             sr_name,
             inv_start_date,
