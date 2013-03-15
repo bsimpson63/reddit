@@ -3287,21 +3287,6 @@ class PromoteLinkForm(Templated):
         self.editable = (c.user_is_sponsor or c.user.trusted_sponsor
                          or not promote.is_promoted(link))
 
-class PromoteLinkFormCpm(PromoteLinkForm):
-    def __init__(self, sr=None, link=None, listing='',
-                 timedeltatext='', *a, **kw):
-        self.setup(sr, link, listing, timedeltatext, *a, **kw)
-        
-        if not c.user_is_sponsor:
-            self.now = promote.promo_datetime_now().date()
-            start_date = self.now
-            end_date = self.now + datetime.timedelta(60) # two months
-            self.inventory = promote.get_available_impressions(sr, start_date, end_date)
-
-        Templated.__init__(self, sr=sr, datefmt = datefmt,
-                           timedeltatext=timedeltatext, listing = listing,
-                           bids = self.bids, *a, **kw)
-
 
 class PromoAdminTool(Reddit):
     def __init__(self, query_type=None, launchdate=None, start=None, end=None, *a, **kw):
