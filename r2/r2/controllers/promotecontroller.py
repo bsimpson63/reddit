@@ -412,26 +412,27 @@ class PromoteController(ListingController):
                    l=VLink('link_id'),
                    bid=VFloat('bid', min=0, max=g.max_promote_bid,
                                   coerce=False, error=errors.BAD_BID),
+                   maxdaily=nop('maxdaily'),
                    sr=VSubmitSR('sr', promotion=True),
                    campaign_id36=nop("campaign_id36"),
                    targeting=VLength("targeting", 10))
     def POST_edit_campaign(self, form, jquery, l, campaign_id36,
-                          dates, bid, sr, targeting):
+                          dates, bid, maxdaily, sr, targeting):
         if not l:
             return
 
         start, end = dates or (None, None)
+        impressions = int(bid / (g.CPM_PENNIES / 100.) * 1000) # duplication of inventory method
+        maxdaily = int(maxdaily.replace(',', ''))
 
         if (start and end and not promote.is_accepted(l) and
             not c.user_is_sponsor):
             # if the ad is not approved already, ensure the start date
             # is at least 2 days in the future
-            start = start.date()
-            end = end.date()
             now = promote.promo_datetime_now()
             future = make_offset_date(now, g.min_promote_future,
                                       business_days=True)
-            if start < future.date():
+            if start.date() < future.date():
                 c.errors.add(errors.BAD_FUTURE_DATE,
                              msg_params=dict(day=g.min_promote_future),
                              field="startdate")
@@ -454,19 +455,15 @@ class PromoteController(ListingController):
             form.has_errors('title', errors.TOO_MANY_CAMPAIGNS)
             return
 
-        duration = max((end - start).days, 1)
-
         if form.has_errors('bid', errors.BAD_BID):
             return
 
         # minimum bid depends on user privilege and targeting, checked here
         # instead of in the validator b/c current duration is needed
         if c.user_is_sponsor:
-            min_daily_bid = 0
-        elif targeting == 'one':
-            min_daily_bid = g.min_promote_bid * 1.5
+            min_bid = 0
         else:
-            min_daily_bid = g.min_promote_bid
+            min_bid = g.min_promote_bid
 
         if campaign_id36:
             # you cannot edit the bid of a live ad unless it's a freebie
@@ -481,10 +478,10 @@ class PromoteController(ListingController):
             except NotFound:
                 pass
 
-        if bid is None or bid / duration < min_daily_bid:
+        if bid is None or bid < min_bid:
             c.errors.add(errors.BAD_BID, field='bid',
-                         msg_params={'min': min_daily_bid,
-                                       'max': g.max_promote_bid})
+                         msg_params={'min': min_bid,
+                                     'max': g.max_promote_bid})
             form.has_errors('bid', errors.BAD_BID)
             return
 
@@ -506,17 +503,24 @@ class PromoteController(ListingController):
         if targeting == 'none':
             sr = None
 
+        # TODO: client side check for full dates to show a warning about
+        # partial delivery
+
         if campaign_id36 is not None:
             campaign = PromoCampaign._byID36(campaign_id36)
-            promote.edit_campaign(l, campaign, dates, bid, sr)
+            promote.edit_campaign(l, campaign, dates, bid, impressions,
+                                  maxdaily, sr)
             r = promote.get_renderable_campaigns(l, campaign)
             jquery.update_campaign(r.campaign_id36, r.start_date, r.end_date,
-                                   r.duration, r.bid, r.sr, r.status)
+                                   r.duration, r.bid, r.impressions, r.maxdaily,
+                                   r.sr, r.status)
         else:
-            campaign = promote.new_campaign(l, dates, bid, sr)
+            campaign = promote.new_campaign(l, dates, bid, impressions,
+                                            maxdaily, sr)
             r = promote.get_renderable_campaigns(l, campaign)
             jquery.new_campaign(r.campaign_id36, r.start_date, r.end_date,
-                                r.duration, r.bid, r.sr, r.status)
+                                r.duration, r.bid, r.impressions, r.maxdaily,
+                                r.sr, r.status)
 
     @validatedForm(VSponsor('link_id'),
                    VModhash(),

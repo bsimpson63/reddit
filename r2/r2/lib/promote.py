@@ -223,13 +223,15 @@ def get_roadblocks():
 # control functions
 
 class RenderableCampaign():
-    def __init__(self, campaign_id36, start_date, end_date, duration, bid, sr,
-                 status):
+    def __init__(self, campaign_id36, start_date, end_date, duration, bid,
+                 impressions, maxdaily, sr, status):
         self.campaign_id36 = campaign_id36
         self.start_date = start_date
         self.end_date = end_date
         self.duration = duration
         self.bid = bid
+        self.impressions = impressions
+        self.maxdaily = maxdaily
         self.sr = sr
         self.status = status
 
@@ -248,6 +250,8 @@ class RenderableCampaign():
             duration = strings.time_label % dict(num=ndays,
                             time=ungettext("day", "days", ndays))
             bid = "%.2f" % camp.bid
+            impressions = getattr(camp, 'impressions', 'NA')
+            maxdaily = getattr(camp, 'maxdaily', 'NA')
             sr = camp.sr_name
             status = {'paid': bool(transaction),
                       'complete': False,
@@ -263,8 +267,8 @@ class RenderableCampaign():
                 elif transaction.is_charged():
                     status['complete'] = True
 
-            rc = cls(campaign_id36, start_date, end_date, duration, bid, sr,
-                     status)
+            rc = cls(campaign_id36, start_date, end_date, duration, bid,
+                     impressions, maxdaily, sr, status)
             r.append(rc)
         return r
 
@@ -371,10 +375,11 @@ def get_transactions(link, campaigns):
     bids_by_campaign = {c._id: bid_dict[(c._id, c.trans_id)] for c in campaigns}
     return bids_by_campaign
 
-def new_campaign(link, dates, bid, sr):
+def new_campaign(link, dates, bid, impressions, maxdaily, sr):
     # empty string for sr_name means target to all
     sr_name = sr.name if sr else ""
-    campaign = PromoCampaign._new(link, sr_name, bid, dates[0], dates[1])
+    campaign = PromoCampaign._new(link, sr_name, bid, impressions, maxdaily,
+                                  dates[0], dates[1])
     PromotionWeights.add(link, campaign._id, sr_name, dates[0], dates[1], bid)
     PromotionLog.add(link, 'campaign %s created' % campaign._id)
     author = Account._byID(link.author_id, True)
@@ -385,7 +390,7 @@ def new_campaign(link, dates, bid, sr):
 def free_campaign(link, campaign, user):
     auth_campaign(link, campaign, user, -1)
 
-def edit_campaign(link, campaign, dates, bid, sr):
+def edit_campaign(link, campaign, dates, bid, impressions, maxdaily, sr):
     sr_name = sr.name if sr else '' # empty string means target to all
     try:
         # if the bid amount changed, cancel any pending transactions
@@ -397,7 +402,8 @@ def edit_campaign(link, campaign, dates, bid, sr):
                                     dates[0], dates[1], bid)
 
         # update values in the db
-        campaign.update(dates[0], dates[1], bid, sr_name, campaign.trans_id, commit=True)
+        campaign.update(dates[0], dates[1], bid, impressions, maxdaily, sr_name,
+                        campaign.trans_id, commit=True)
 
         # record the transaction
         text = 'updated campaign %s. (bid: %0.2f)' % (campaign._id, bid)

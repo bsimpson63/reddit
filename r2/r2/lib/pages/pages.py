@@ -3283,7 +3283,7 @@ class PromoteLinkForm(Templated):
                 )
                 self.history_table.append(row)
 
-        self.min_daily_bid = 0 if c.user_is_admin else g.min_promote_bid
+        self.min_bid = 0 if c.user_is_sponsor else g.min_promote_bid
         self.user_is_trusted = c.user_is_sponsor or c.user.trusted_sponsor
         self.editable = (c.user_is_sponsor or c.user.trusted_sponsor
                          or not promote.is_promoted(link))
