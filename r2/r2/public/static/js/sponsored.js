@@ -338,6 +338,9 @@ function edit_campaign(elem) {
                             c.find('*[name="sr"]').val("").prop("disabled", "disabled").end()
                                 .find(".targeting").hide();
                         }
+                        if ($('#inventory-title').length) {
+                            set_inventory_table(targeting ? targeting : ' reddit.com');
+                        }
                         /* attach the dates to the date widgets */
                         init_startdate();
                         init_enddate();
@@ -404,6 +407,10 @@ function view_campaign(elem) {
 // writes rows into inventory table when subreddit selector changes
 function update_inventory_table() {
    var sr = $('#targeting').attr('checked') ? $('#sr-autocomplete').val() : ' reddit.com';
+   set_inventory_table(sr);
+}
+
+function set_inventory_table(sr) {
    $.ajax({
        url: '/promoted/inventory/' + sr,
        type: 'GET',
