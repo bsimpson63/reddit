@@ -298,13 +298,15 @@ ${self.javascript_setup()}
         <%
             start_title = "Date when your sponsored link will start running.  We start new campaigns at midnight UTC+5"
             end_title = "Date when your sponsored link will end (at midnight UTC+5)"
+            impressions_title = "maximum impressions this campaign will receive"
+            max_daily_title = "maximum impressions per day"
             targeting_title = "name of the community that you are targeting. A blank entry here means that the ad is untargeted and will run site-wide "
             newcamp_title = "click to create a new campaign.  To edit an existing campaing in the table below, click the 'edit' button."
          %>
 
         <table class="preftable">
           <tr>
-            <th>duration</th>
+            <th>dates</th>
             <td class="prefright">
               <input type="hidden" id="date-min" name="date-min" value="${thing.mindate}" />
               <%self:datepicker name="startdate", value="${thing.startdate}"
@@ -330,7 +332,13 @@ ${self.javascript_setup()}
           </tr>
 
           <tr>
-            <th>total bid</th>
+            <th>duration</th>
+            <td class="prefright duration">
+            </td>
+          </tr>
+
+          <tr>
+            <th>maximum spend</th>
             <td class="prefright">
               ${error_field("BAD_BID", "bid", "div")}
               ${error_field("BID_LIVE", "bid", "div")}
@@ -339,27 +347,56 @@ ${self.javascript_setup()}
                       style="width:auto"
                       onchange="update_bid(this)"
                       onkeyup="update_bid(this)"
-                      title="Minimum is $${'%.2f' % thing.min_daily_bid} per day, or $${'%.2f' % (thing.min_daily_bid * 1.5)} per day targeted"
-                      value="${'%.2f' % (thing.min_daily_bid * 5)}"
-                      data-min_daily_bid="${thing.min_daily_bid}"/>
-              <span class="bid-info gray"></span>
+                      title="Minimum is $${'%.2F' % thing.min_bid}"
+                      value="${'%.2f' % (thing.min_bid * 5)}"
+                      data-min_bid="${thing.min_bid}"
+                      data-cpm_pennies="${g.CPM_PENNIES}"/>
+              <div class="minimum-spend">
+                ${_("$%.2F minimum") % thing.min_bid}
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <th>price</th>
+            <td class="prefright">
+              ${_("$%.2F per 1000 impressions") % (g.CPM_PENNIES / 100.)}
+            </td>
+          </tr>
+
+          <tr>
+            <th>impressions</th>
+              <td class="prefright">
+                <span class="impression-info"></span>
+              </td>
+          </tr>
+
+          <tr>
+            <th>maximum daily impressions</th>
+            <td class="prefright">
+              <input id="maxdaily" name="maxdaily" size="7" type="text"
+                     class="rounded styled-input"
+                     style="width:auto">
             </td>
           </tr>
 
           <tr>
             <th>targeting</th>
             <td class="prefright">
-              <input id="no_targeting" class="nomargin" 
-                     type="radio"  value="none" name="targeting"
-                     onclick="return targeting_off(this)"
-                     checked="checked" /> 
-              <label for="no_targeting">no targeting (displays site-wide)</label>
-              <p id="no_targeting_minimum" class="minimum-spend">minimum $20 / day</p>
-              <input id="targeting" class="nomargin" 
-                     type="radio"  value="one" name="targeting"
-                     onclick="return targeting_on(this)" /> 
-              <label for="targeting">enable targeting (runs on a specific subreddit)</label>
-              <p id="targeted_minimum" class="minimum-spend">minimum $30 / day</p>
+              <label>
+                <input id="no_targeting" class="nomargin" 
+                       type="radio"  value="none" name="targeting"
+                       onclick="return targeting_off(this)"
+                       checked="checked" /> 
+                no targeting (displays site-wide)
+              </label>
+              <br />
+              <label>
+                <input id="targeting" class="nomargin" 
+                       type="radio"  value="one" name="targeting"
+                       onclick="return targeting_on(this)" /> 
+                enable targeting (runs on a specific subreddit)
+              </label>
 
               <script type="text/javascript">
                 $(function() { 
@@ -437,6 +474,8 @@ ${self.javascript_setup()}
             <th title="${end_title}">end</th>
             <th>duration</th>
             <th>bid</th>
+            <th title="${impressions_title}">impressions</th>
+            <th title="${max_daily_title}">daily impressions</th>
             <th title="${targeting_title}">targeting</th>
             <th style="align:right">
               <button class="new-campaign fancybutton" 
@@ -452,7 +491,7 @@ ${self.javascript_setup()}
               %for rc in sorted(thing.campaigns, key=lambda rc: rc.start_date):
                 $.new_campaign(${unsafe(','.join(simplejson.dumps(attr) for attr in
                     [rc.campaign_id36, rc.start_date, rc.end_date, rc.duration,
-                     rc.bid, rc.sr, rc.status]))});
+                     rc.bid, rc.impressions, rc.maxdaily, rc.sr, rc.status]))});
               %endfor
               $.set_up_campaigns();
             });

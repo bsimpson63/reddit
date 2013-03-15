@@ -10,31 +10,31 @@ function update_bid(elem) {
              Date.parse(form.find('*[name="startdate"]').val())) / (86400*1000));
     ndays = Math.round(ndays);
 
-    // min bid is slightly higher for targeted promos
-    var minimum_daily_bid = is_targeted ? $("#bid").data("min_daily_bid") * 1.5 : 
-                                          $("#bid").data("min_daily_bid");
+    var minimum_bid = $("#bid").data("min_bid"),
+        pennies_per_mille = $("#bid").data("cpm_pennies"),
+        impressions = bid / pennies_per_mille * 100000,
+        impressions_per_day = impressions / ndays;
+
     $(".minimum-spend").removeClass("error");
-    if (bid < ndays * minimum_daily_bid) {
-        $(".bid-info").addClass("error");
-        if (is_targeted) {
-            $("#targeted_minimum").addClass("error");
-        } else {
-            $("#no_targeting_minimum").addClass("error");
-        }
+    if (bid < minimum_bid) {
+        $(".minimum-spend").addClass("error");
 
         form.find('button[name="create"], button[name="save"]')
             .prop("disabled", "disabled")
             .addClass("disabled");
     } else {
-        $(".bid-info").removeClass("error");
         form.find('button[name="create"], button[name="save"]')
             .removeProp("disabled")
             .removeClass("disabled");
     }
 
-    $(".bid-info").html("&nbsp; &rarr;" + 
-                        "<b>$" + (bid/ndays).toFixed(2) +
-         "</b> per day for <b>" + ndays + " day(s)</b>");
+    /* add thousands place commas and set impressions per day to 120% of even */
+    impressions = impressions.toFixed(0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    impressions_per_day = (ndays > 1) ? 1.2 * impressions_per_day : impressions_per_day
+
+    $(".duration").html(ndays + ((ndays > 1) ? " days" : " day"))
+    $(".impression-info").html(impressions + " impressions")
+    $("#maxdaily").val(impressions_per_day.toFixed(0))
  }
 
 var dateFromInput = function(selector, offset) {
@@ -135,13 +135,15 @@ function get_flag_class(flags) {
 }
 
 $.new_campaign = function(campaign_id36, start_date, end_date, duration, 
-                          bid, targeting, flags) {
+                          bid, impressions, maxdaily, targeting, flags) {
     cancel_edit(function() {
       var data =('<input type="hidden" name="startdate" value="' + 
                  start_date +'"/>' + 
                  '<input type="hidden" name="enddate" value="' + 
                  end_date + '"/>' + 
                  '<input type="hidden" name="bid" value="' + bid + '"/>' +
+                 '<input type="hidden" name="impressions" value="' + impressions + '"/>' +
+                 '<input type="hidden" name="maxdaily" value="' + maxdaily + '"/>' +
                  '<input type="hidden" name="targeting" value="' + 
                  (targeting || '') + '"/>' +
                  '<input type="hidden" name="campaign_id36" value="' + campaign_id36 + '"/>');
@@ -153,7 +155,9 @@ $.new_campaign = function(campaign_id36, start_date, end_date, duration,
           data += ("<input type='hidden' name='view_live_url' value='" + 
                    flags.view_live_url + "'/>");
       }
-      var row = [start_date, end_date, duration, "$" + bid, targeting, data];
+      var row = [start_date, end_date, duration, "$" + bid,
+                 pretty_number(impressions), pretty_number(maxdaily), targeting,
+                 data];
       $(".existing-campaigns .error").hide();
       var css_class = get_flag_class(flags);
       $(".existing-campaigns table").show()
@@ -166,7 +170,8 @@ $.new_campaign = function(campaign_id36, start_date, end_date, duration,
 };
 
 $.update_campaign = function(campaign_id36, start_date, end_date, 
-                             duration, bid, targeting, flags) {
+                             duration, bid, impressions, maxdaily, targeting,
+                             flags) {
     cancel_edit(function() {
             $('.existing-campaigns input[name="campaign_id36"]')
                 .filter('*[value="' + (campaign_id36 || '0') + '"]')
@@ -176,12 +181,15 @@ $.update_campaign = function(campaign_id36, start_date, end_date,
                 .next().html(end_date)
                 .next().html(duration)
                 .next().html("$" + bid).removeClass()
+                .next().html(impressions)
+                .next().html(maxdaily)
                 .next().html(targeting)
                 .next()
                 .find('*[name="startdate"]').val(start_date).end()
                 .find('*[name="enddate"]').val(end_date).end()
                 .find('*[name="targeting"]').val(targeting).end()
                 .find('*[name="bid"]').val(bid).end()
+                .find('*[name="maxdaily"]').val(maxdaily).end()
                 .find("button, span").remove();
             $.set_up_campaigns();
         });
@@ -199,7 +207,7 @@ $.set_up_campaigns = function() {
             var td = $(this).find("td:last");
             var bid_td = $(this).find("td:first").next().next().next()
                 .addClass("bid");
-            var target_td = $(this).find("td:nth-child(5)")
+            var target_td = $(this).find("td:nth-child(7)")
             if(td.length && ! td.children("button, span").length ) {
                 if(tr.hasClass("live")) {
                     $(target_td).append($(view).addClass("view")
@@ -313,11 +321,11 @@ function edit_campaign(elem) {
                                 "css_class": "", "cells": [""]}], 
                     tr.rowIndex + 1);
             $("#edit-campaign-tr").children('td:first')
-                .attr("colspan", 6).append(campaign).end()
+                .attr("colspan", 8).append(campaign).end()
                 .prev().fadeOut(function() { 
                         var data_tr = $(this);
                         var c = $("#campaign");
-                        $.map(['startdate', 'enddate', 'bid', 'campaign_id36'], 
+                        $.map(['startdate', 'enddate', 'bid', 'maxdaily', 'campaign_id36'],
                               function(i) {
                                   i = '*[name="' + i + '"]';
                                   c.find(i).val(data_tr.find(i).val());
@@ -347,6 +355,7 @@ function edit_campaign(elem) {
                         c.find('button[name="save"]').show().end()
                             .find('button[name="create"]').hide().end();
                         update_bid('*[name="bid"]');
+                        $('.bidding-history').show()
                         c.fadeIn();
                     } );
             }
@@ -432,4 +441,13 @@ function set_inventory_table(sr) {
            });
        }   
    }); 
+}
+
+function pretty_number(number) {
+    var numberAsInt = parseInt(number)
+    if (numberAsInt) {
+        return numberAsInt.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    } else {
+        return number
+    }
 }
