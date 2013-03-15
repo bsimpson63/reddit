@@ -32,9 +32,30 @@
 ${unsafe(js.use('sponsored'))}
 
 <%def name="javascript_setup()">
-  <script type="text/javascript">
-    $(function() { update_bid("*[name=bid]"); }); 
-  </script>
+  %if c.user_is_sponsor:
+    <script type="text/javascript">
+        $(function() { 
+            update_bid("*[name=bid]"); 
+
+            /* load available impressions viz */
+            update_inventory_table();
+
+            /* add change handler to radio that will load front-page imps when
+               user switches from targeted to untargeted */
+            $("#no_targeting").change(function() {
+                $("#sr-autocomplete").val("");
+                update_inventory_table();
+            });
+
+            /* wire sr selector to update inventory viz on selection change */
+            $("#sr-autocomplete").bind("sr-changed", update_inventory_table);
+        }); 
+    </script>
+  %else:
+    <script type="text/javascript">
+      $(function() { update_bid("*[name=bid]"); }); 
+    </script>
+  %endif
 </%def>
 
 ${self.javascript_setup()}
@@ -535,5 +556,11 @@ ${self.javascript_setup()}
         </div>
       </%utils:line_field>
     </form>
+
+    <%utils:line_field id="inventory-title" title="" css_class="rounded">
+      <table id="inventory" class="bidding-history">
+      </table>
+    </%utils:line_field>
+
   </div>
 </%def>
