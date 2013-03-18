@@ -3252,36 +3252,6 @@ class PromoteLinkForm(Templated):
                         amount_str='$%.2f' % bid.bid,
                     )
                     self.bids.append(row)
-        else:
-            promo_traffic = dict(promote.traffic_totals())
-            promo_start = promote.promo_datetime_now(offset=-14).date()
-            promo_end = promote.promo_datetime_now(offset=14).date()
-            market, promo_counter = Promote_Graph.get_market(None, promo_start,
-                                                             promo_end)
-            max_promo_count = max(promo_counter.values() or [1])
-            self.history_table = []
-
-            for i in xrange(0, 28):
-                the_future = (i >= 14)
-                day = (now.date() + datetime.timedelta(i-14))
-                promo_count = promo_counter.get(i, 0)
-                cpm = cpc = imp_traffic = cli_traffic = "---"
-
-                if promo_traffic.has_key(day):
-                    imp_traffic, cli_traffic = promo_traffic[day]
-                    if market.has_key(i) and not the_future:
-                        cpm = "$%.2f" % (market[i] * 1000./max(imp_traffic, 1))
-                        cpc = "$%.2f" % (market[i] * 1./max(cli_traffic, 1))
-
-                row = Storage(
-                    day=day.strftime("%m/%d/%Y"),
-                    today=(i == 14),
-                    cpm=cpm,
-                    cpc=cpc,
-                    promo_count=promo_count,
-                    width=int(50. * promo_count / max_promo_count),
-                )
-                self.history_table.append(row)
 
         self.min_bid = 0 if c.user_is_sponsor else g.min_promote_bid
         self.user_is_trusted = c.user_is_sponsor or c.user.trusted_sponsor

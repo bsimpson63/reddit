@@ -100,8 +100,6 @@ ${self.javascript_setup()}
 
   %if c.user_is_sponsor:
     ${self.sponsor_right_panel()}
-  %else:
-    ${self.user_right_panel()}
   %endif
 </div>
 
@@ -502,42 +500,6 @@ ${self.javascript_setup()}
           You don't have any campaigns for this link yet.  You should add one.
         </p>
       </div>
-    </%utils:line_field>
-  </div>
-</%def>
-
-<%def name="user_right_panel()">
-  <div class="bidding-history" style="padding-top: 0px;">
-    <%utils:line_field title="${_('promotion history')}" css_class="rounded">
-      <p style="font-size:smaller; margin: 5px;">
-        Here is a summary of the data presented on the&#32;<a href="/promoted/graph">graph page</a>.
-        Remember: best to pick days with less competition.
-      </p>
-
-      <table class="bidding-history">
-        <tr>
-          <th>date</th>
-          <th>CPM</th>
-          <th>CPC</th>
-          <th>count</th>
-          <th></th>
-        </tr>
-
-        %for row in thing.history_table:
-          <tr>
-            <th>
-              ${unsafe("&raquo;" if row.today else '')}
-              ${row.day}
-            </th>
-            <td>${row.cpm}</td>
-            <td>${row.cpc}</td>
-            <td>${row.promo_count}</td>
-            <td>
-              <div class="graph" style="width:${row.width}px"></div>
-            </td>
-          </tr>
-        %endfor
-      </table>
     </%utils:line_field>
   </div>
 </%def>
