@@ -34,8 +34,7 @@ ${unsafe(js.use('sponsored'))}
 <%def name="javascript_setup()">
   %if c.user_is_sponsor:
     <script type="text/javascript">
-        $(function() { 
-            update_bid("*[name=bid]"); 
+        $(function() {
 
             /* load available impressions viz */
             update_inventory_table();
@@ -50,10 +49,6 @@ ${unsafe(js.use('sponsored'))}
             /* wire sr selector to update inventory viz on selection change */
             $("#sr-autocomplete").bind("sr-changed", update_inventory_table);
         }); 
-    </script>
-  %else:
-    <script type="text/javascript">
-      $(function() { update_bid("*[name=bid]"); }); 
     </script>
   %endif
 </%def>
@@ -311,14 +306,13 @@ ${self.javascript_setup()}
                                 minDateSrc="date-min" initfuncname="init_startdate">
                 function(elem) {
                   check_enddate(elem, $("#enddate"));
-                  update_bid(elem);
                 }
               </%self:datepicker>
               -
               <%self:datepicker name="enddate", value="${thing.enddate}"
                                 minDateSrc="startdate" initfuncname="init_enddate"
                                 min_date_offset="86400000">
-                function(elem) { update_bid(elem); }
+                function(elem) {}
               </%self:datepicker>
 
               ${error_field("BAD_DATE", "startdate", "div")}
@@ -344,7 +338,6 @@ ${self.javascript_setup()}
                       class="rounded styled-input"
                       style="width:auto"
                       onchange="update_bid(this)"
-                      onkeyup="update_bid(this)"
                       title="Minimum is $${'%.2F' % thing.min_bid}"
                       value="${'%.2f' % (thing.min_bid * 5)}"
                       data-min_bid="${thing.min_bid}"
@@ -417,7 +410,6 @@ ${self.javascript_setup()}
               init_enddate();
               $("#campaign").find("button[name=create]").show().end()
                     .find("button[name=save]").hide().end();
-              update_bid("*[name=bid]");
             })
         </script>
 

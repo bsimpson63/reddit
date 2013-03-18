@@ -122,15 +122,11 @@ function check_enddate(startdate, enddate) {
 function targeting_on(elem) {
     $(elem).parents(".campaign").find(".targeting")
         .find('*[name="sr"]').prop("disabled", "").end().slideDown();
-
-    update_bid(elem);
 }
 
 function targeting_off(elem) {
     $(elem).parents(".campaign").find(".targeting")
         .find('*[name="sr"]').prop("disabled", "disabled").end().slideUp();
-
-    update_bid(elem);
 }
 
 (function($) {
@@ -413,7 +409,6 @@ function create_campaign(elem) {
                 .find(".targeting").hide().end()
                 .find('*[name="sr"]').val("").prop("disabled", "disabled").end()
                 .fadeIn();
-            update_bid('*[name="bid"]');
         });
 }
 
