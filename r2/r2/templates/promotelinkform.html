@@ -431,6 +431,10 @@ ${self.javascript_setup()}
           ${reddit_selector(thing.default_sr, thing.sr_searches, thing.subreddits)}
         </div>
 
+        <span class="error overbooked" style="display:none">
+          ${_('We are running low on inventory for your selected target and dates. We will try to deliver in full and you will only pay for the impressions you receive.')}
+        </span>
+
         <div class="buttons">
           <input type="hidden" name="campaign_id36" value="" />
           <span class="status error"></span>

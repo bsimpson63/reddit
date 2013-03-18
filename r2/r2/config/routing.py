@@ -173,6 +173,7 @@ def make_map():
     mc('/promoted/admin/graph', controller='promote', action='admingraph')
     mc('/promoted/inventory/:sr_name',
        controller='promote', action='inventory')
+    mc('/promoted/overbooked', controller='promote', action='overbooked')
     mc('/promoted/traffic/headline/:link',
        controller='front', action='promo_traffic')
 

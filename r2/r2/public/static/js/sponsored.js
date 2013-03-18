@@ -6,9 +6,10 @@ function update_bid(elem) {
     var form = $(elem).parents(".campaign");
     var is_targeted = $("#targeting").prop("checked");
     var bid = parseFloat(form.find('*[name="bid"]').val());
-    var ndays = ((Date.parse(form.find('*[name="enddate"]').val()) -
-             Date.parse(form.find('*[name="startdate"]').val())) / (86400*1000));
-    ndays = Math.round(ndays);
+    var start = new Date(form.find('*[name="startdate"]').val());
+    var end = new Date(form.find('*[name="enddate"]').val());
+    var ndays = Math.round((end.valueOf() - start.valueOf()) / (86400*1000));
+    var sr_name = is_targeted ? $('#sr-autocomplete').val() : ' reddit.com';
 
     var minimum_bid = $("#bid").data("min_bid"),
         pennies_per_mille = $("#bid").data("cpm_pennies"),
@@ -28,13 +29,33 @@ function update_bid(elem) {
             .removeClass("disabled");
     }
 
-    /* add thousands place commas and set impressions per day to 120% of even */
-    impressions = impressions.toFixed(0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
     impressions_per_day = (ndays > 1) ? 1.2 * impressions_per_day : impressions_per_day
 
+    impressions = Math.floor(impressions)
+    impressions_per_day = Math.floor(impressions_per_day)
+
     $(".duration").html(ndays + ((ndays > 1) ? " days" : " day"))
-    $(".impression-info").html(impressions + " impressions")
-    $("#maxdaily").val(impressions_per_day.toFixed(0))
+    $(".impression-info").html(pretty_number(impressions) + " impressions")
+    $("#maxdaily").val(pretty_number(impressions_per_day))
+
+    $('.overbooked').hide()
+    $.ajax({
+        url: '/promoted/overbooked',
+        type: 'GET',
+        dataType: 'json',
+        data: {
+            sr_name: sr_name,
+            start: $.datepicker.formatDate('yymmdd', start),
+            end: $.datepicker.formatDate('yymmdd', end),
+            maxdaily: impressions_per_day,
+            impressions: impressions
+        },
+        success: function(data) {
+            if (data.overbooked) {
+                $('.overbooked').show()
+            }
+        }
+    })
  }
 
 var dateFromInput = function(selector, offset) {

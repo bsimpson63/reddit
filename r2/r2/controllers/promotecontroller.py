@@ -228,6 +228,21 @@ class PromoteController(ListingController):
                            'imps':impressions,
                            'max_imps':max_imps})
 
+    @validate(sr_name=nop('sr_name'),
+              start=VDate('start', format='%Y%m%d'),
+              end=VDate('end', format='%Y%m%d'),
+              maxdaily=VInt('maxdaily'),
+              impressions=VInt('impressions'))
+    def GET_overbooked(self, sr_name, start, end, maxdaily, impressions):
+        end -= timedelta(days=1) # end is non inclusive
+        available = inventory.get_available_impressions(
+            sr_name,
+            start,
+            end,
+        )
+        total = sum([min(a, maxdaily) for a in available.itervalues()])
+        return json.dumps({'overbooked': total < impressions})
+
     # ## POST controllers below
     @validatedForm(VSponsorAdmin(),
                    link=VLink("link_id"),
