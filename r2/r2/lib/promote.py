@@ -33,6 +33,7 @@ from pylons.i18n import ungettext
 
 from r2.lib.wrapped import Wrapped
 from r2.lib import (
+    adzerk,
     amqp,
     authorize,
     emailer,
@@ -846,6 +847,86 @@ def get_total_run(link):
 
     return earliest, latest
 
+# Move to ini
+adzerk_site_id = 27843
+adzerk_advertiser_id = 20329
+adzerk_priority_id = 21520
+adzerk_channel_id = 8186    # All sites
+adzerk_publisher_id = 9649
+
+#
+
+# keyword for frontpage is reddit.com
+
+def date_to_adzerk(d):
+    return d.strftime('%m/%d/%Y')
+
+
+def sr_to_keyword(sr_name):
+    return sr_name or 'reddit.com'
+
+
+def add_adzerk_link(link, ret=False):
+    """Add promoted link as adzerk campaign"""
+    az_campaign = None
+    if hasattr(link, 'adzerk_id'):
+        print 'link %s already has adzerk Campaign %s' % (link._fullname,
+                                                          link.adzerk_id)
+        if ret:
+            az_campaign = adzerk.Campaign.get(link.adzerk_id)
+    else:
+        az_campaign = adzerk.Campaign.create(
+            name=link._fullname,
+            advertiser_id=adzerk_advertiser_id,
+            start_date=date_to_adzerk(link._date),
+            is_deleted=False,
+            is_active=False,    # Maybe default to True?
+            price=0.,
+            flights=[],
+        )
+        print 'link %s associated with adzerk Campaign %s' % (link._fullname,
+                                                              az_campaign.id)
+        link.adzerk_id = az_campaign.id
+        link._commit()
+
+    if ret:
+        return az_campaign
+
+
+def add_adzerk_campaign(link, campaign):
+    """Add campaign as adzerk flight"""
+    az_campaign = add_adzerk_link(link, ret=True)
+    az_campaign.is_active = True
+    az_campaign._send()
+
+    az_flight = adzerk.Flight.create(
+        start_date=date_to_adzerk(campaign.start_date),
+        end_date=date_to_adzerk(campaign.end_date),
+        price=0.,
+        option_type=1, # CPM
+        impressions=campaign.impressions,
+        is_unlimited=False,
+        is_no_duplicates=False,
+        is_full_speed=False,
+        keywords=sr_to_keyword(campaign.sr_name),
+        user_agent_keywords='',
+        campaign_id=az_campaign.id,
+        priority_id=adzerk_priority_id,
+        is_deleted=False,
+        is_active=True,
+        goal_type=1, # Not needed?
+        rate_type=2, # CPM, Not needed?
+        is_freq_cap=True,
+        freq_cap=campaign.maxdaily,
+        freq_cap_duration=1,
+        freq_cap_type=2, # daily
+    )
+    campaign.adzerk_id = az_flight.id
+    campaign._commit()
+
+def update_adzerk():
+    adzerk.set_key(g.adzerk_key)
+    pass
 
 def Run(offset=0, verbose=True):
     """reddit-job-update_promos: Intended to be run hourly to pull in
