@@ -28,12 +28,12 @@ import json
 import random
 import time
 
+import adzerk
 from pylons import g, c
 from pylons.i18n import ungettext
 
 from r2.lib.wrapped import Wrapped
 from r2.lib import (
-    adzerk,
     amqp,
     authorize,
     emailer,
