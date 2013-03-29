@@ -22,7 +22,7 @@
 
 from __future__ import with_statement
 
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict, namedtuple, defaultdict
 from datetime import datetime, timedelta
 import json
 import random
@@ -849,14 +849,118 @@ def get_total_run(link):
 
 # Move to ini
 adzerk_site_id = 27843
-adzerk_advertiser_id = 20329
+adzerk_advertiser_id = 20329    # self serve
 adzerk_priority_id = 21520
 adzerk_channel_id = 8186    # All sites
 adzerk_publisher_id = 9649
 
-#
+"""
+Required pieces:
+- Link --> adzerk Campaign
+- Link --> adzerk Creative
+  - update at intervals to reflect #comments, votes?
+- PromoCampaign --> adzerk Flight
+- Link, PromoCampaign --> adzerk FlightCampaignMap
+- void
+
+- adzerk status
+  - Campaigns, Creatives, Flights, Maps
+
+- reddit status
+  - PromotionWeights --> adzerk
+
+"""
 
 # keyword for frontpage is reddit.com
+
+
+class AdzerkState(object):
+    """Wrapper over adzerk state to get closer to reddit's ad model"""
+    def __init__(self):
+        self.sites = []
+        self.zones = []
+        self.channels = []
+        self.publishers = []
+        self.priorities = []
+        self.advertisers = []
+        self.creatives = []
+        self.flights = []
+        self.campaigns = []
+        self.maps = []
+
+    def load(self):
+        self.sites = adzerk.Site.list()
+        self.zones = adzerk.Zone.list()
+        self.channels = adzerk.Channel.list()
+        self.publishers = adzerk.Publisher.list()
+        self.priorities = adzerk.Priority.list()
+        self.advertisers = adzerk.Advertiser.list()
+        for advertiser in self.advertisers:
+            creatives = adzerk.Creative.list(advertiser.Id) or []
+            self.creatives.extend(creatives)
+        self.flights = adzerk.Flight.list()
+        self.campaigns = adzerk.Campaign.list()
+        for flight in self.flights:
+            maps = adzerk.CreativeFlightMap.list(flight.Id) or []
+            self.maps.extend(maps)
+
+    def validate(self):
+        pass
+
+
+def get_adzerk_state():
+    # confirm there's only one site?
+    # confirm there's only one (or however many) advertiser?
+    site = adzerk.Site.get(adzerk_site_id)
+    advertiser = adzerk.Advertiser.get(adzerk_advertiser_id)
+
+    creatives = adzerk.Creative.list(adzerk_advertiser_id)
+
+    ###
+    sites = adzerk.Site.list()
+
+    zones = adzerk.Zone.list()
+    zones_by_site = defaultdict(list)
+    for zone in zones:
+        zones_by_site[zone.SiteId].append(zone)
+
+    channels = adzerk.Channel.list()
+    publishers = adzerk.Publisher.list()
+
+    priorities = adzerk.Priority.list()
+    priorities_by_channel = defaultdict(list)
+    for priority in priorities:
+        priorities_by_channel[priority.ChannelId].append(priority)
+
+    advertisers = adzerk.Advertiser.list()
+    creatives_by_advertiser = {}
+    for advertiser in advertisers:
+        creatives = adzerk.Creative.list(advertiser.Id)
+        creatives_by_advertiser[advertiser.Id] = creatives
+
+    flights = adzerk.Flight.list()
+    flights_by_campaign = defaultdict(list)
+    for flight in flights:
+        flights_by_campaign[flight.CampaignId].append(flight)
+
+    campaigns = adzerk.Campaign.list()
+    # campaigns don't send flights?, we do get them above
+    campaigns_by_advertiser = defaultdict(list)
+    for campaign in campaigns:
+        campaigns_by_advertiser[campaign.AdvertiserId].append(campaign)
+
+    # in adzerk's world, creatives aren't limited to a single campaign
+    # or flight
+    # in reddit's world Links are Creative and Campaign
+    # and a PromoCampaigns are Flights
+    # a Link can have multiple PromoCampaigns
+    # need to make sure that each Flights are tied to their Creative
+    # maps have some delivery options, need to check how to use those!
+    mapped_creatives_by_flight = {}
+    for flight in flights:
+        maps = adzerk.CreativeFlightMap.list(flight.Id)
+        mapped_creatives_by_flight[flight.Id] = maps
+
 
 def date_to_adzerk(d):
     return d.strftime('%m/%d/%Y')
