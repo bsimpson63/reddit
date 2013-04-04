@@ -43,7 +43,7 @@ from r2.lib.memoize import memoize
 from r2.lib.organic import keep_fresh_links
 from r2.lib.strings import strings
 from r2.lib.template_helpers import get_domain
-from r2.lib.utils import UniqueIterator, tup, weighted_lottery
+from r2.lib.utils import UniqueIterator, tup, weighted_lottery, to36
 from r2.models import (
     Account,
     AdWeight,
@@ -853,6 +853,7 @@ adzerk_advertiser_id = 20329    # self serve
 adzerk_priority_id = 21520
 adzerk_channel_id = 8186    # All sites
 adzerk_publisher_id = 9649
+frontpage_keyword = 'reddit.com'
 
 """
 Required pieces:
@@ -871,12 +872,63 @@ Required pieces:
 
 """
 
+# in adzerk's world, creatives aren't limited to a single campaign
+# or flight
+# in reddit's world Links are Creative and Campaign
+# and a PromoCampaigns are Flights
+# a Link can have multiple PromoCampaigns
+# need to make sure that each Flights are tied to their Creative
+# maps have some delivery options, need to check how to use those!
+
 # keyword for frontpage is reddit.com
 
+"""
+From Adzerk Hierarchy
+* a campaign is a container for a related set of ads
+  * each campaign consists of one or more flights
+* a flight is a set of rules for the ad should be served
+  * rules can be impression goals, tracking methods, dates, targeting
+  * each flight has a priority
+  * each flight contains one or more creatives
+* a creative is the actual ad html or whatever
+* what about creative flight map, whose settings are those?
+  * aren't on the creative because the creative could be used by multiple
+    flights/campaigns
+  * aren't on the flight because a flight could contain multiple creatives!
+  * so: not redundant, necessary organizational piece
 
-class AdzerkState(object):
+Campaign contains several flights
+Flight contains several creatives
+a creative could be assigned to several different flights though
+
+
+To fully describe a Campaign:
+* which flights does it contain
+* (do we need to know creatives?)
+
+To fully describe a Flight
+* which creatives does it contain
+"""
+
+"""
+Requirements:
+* get state of adzerk
+* update adzerk with given list of links, campaigns
+  * don't make duplicates! update if existing
+    * set attributes on reddit things, also we will be naming the adzerk things
+      with the reddit fullname
+* on highest level should not need manal checking, just pass a link, campaign
+  and update adzerk if needed
+* overall check to make sure there aren't extra things active that shouldn't be
+
+Do we need to not set Id if it doesn't exist?
+
+"""
+
+class Adzerk(object):
     """Wrapper over adzerk state to get closer to reddit's ad model"""
-    def __init__(self):
+    def __init__(self, key):
+        adzerk.set_key(key)
         self.sites = []
         self.zones = []
         self.channels = []
@@ -887,6 +939,8 @@ class AdzerkState(object):
         self.flights = []
         self.campaigns = []
         self.maps = []
+        self.flights_by_campaign = defaultdict(list)
+        self.maps_by_flight = defaultdict(list)
 
     def load(self):
         self.sites = adzerk.Site.list()
@@ -904,8 +958,134 @@ class AdzerkState(object):
             maps = adzerk.CreativeFlightMap.list(flight.Id) or []
             self.maps.extend(maps)
 
-    def validate(self):
-        pass
+        for flight in self.flights:
+            self.flights_by_campaign[flight.CampaignId].append(flight)
+
+        for cfmap in self.maps:
+            self.maps_by_flight[cfmap.FlightId].append(cfmap)
+
+        self.campaigns_by_name = {camp.Name for camp in self.campaigns}
+        self.creatives_by_title = {creative.Title for creative in self.creatives}
+        self.flights_by_name = {flight.Name for flight in self.flights}
+
+    def link_to_campaign(self, link):
+        """Add/update a reddit link as an Adzerk Campaign"""
+        campaign = self.campaigns_by_name.get(link._fullname)
+        d = {
+            'AdvertiserId': adzerk_advertiser_id,
+            'IsDeleted': False,
+            'IsActive': True,
+            'Price': 0,
+        }
+
+        if campaign:
+            for key, val in d.iteritems():
+                setattr(campaign, key, val)
+            campaign._send()
+        else:
+            d.update({
+                'Name': link._fullname,
+                'Flights': [],  # TODO: do we want to overwrite this in existing?
+                'StartDate': date_to_adzerk(datetime.now(g.tz)),
+            })
+            campaign = adzerk.Campaign.create(**d)
+            self.campaigns.append(campaign)
+            self.campaigns_by_name[link._fullname] = campaign
+        return campaign
+
+    def link_to_creative(self, link):
+        """Add/update a reddit link as an Adzerk Creative"""
+        creative = self.creatives_by_title.get(link._fullname)
+        d = {
+            'Body': link._fullname, # TODO: put something useful here
+            'AdvertiserId': adzerk_advertiser_id,
+            'AdTypeId': 20, # Static Text Link
+            'Alt': link.title,
+            'IsSync': False,
+            'IsDeleted': False,
+            'IsActive': True,
+        }
+
+        if creative:
+            for key, val in d.iteritems():
+                setattr(creative, key, val)
+            creative._send()
+        else:
+            d.update({'Title': link._fullname})
+            creative = adzerk.Creative.create(**d)
+            self.creatives.append(creative)
+            self.creatives_by_title[link._fullname] = creative
+        return creative
+
+    def campaign_to_flight(self, campaign):
+        """Add/update a reddit campaign as an Adzerk Flight"""
+        az_campaign_name = Link._fullname_from_id36(to36(campaign.link_id))
+        try:
+            az_campaign = self.campaigns_by_name[az_campaign_name]
+        except KeyError:
+            raise ValueError('missing campaign for flight')
+
+        flight = self.flights_by_name.get(campaign._fullname)
+        d = {
+            'StartDate': date_to_adzerk(campaign.start_date),
+            'EndDate': date_to_adzerk(campaign.end_date),
+            'Price': 1, # TODO
+            'OptionType': 1, # 1: CPM, 2: Remainder
+            'Impressions': campaign.impressions,
+            'IsUnlimited': False,
+            'IsFullSpeed': False,
+            'Keywords': campaign.sr_name if campaign.sr_name else frontpage_keyword
+            'CampaignId': az_campaign.Id,
+            'PriorityId': adzerk_priority_id,
+            'IsDeleted': False,
+            'IsActive': True,
+            'GoalType': 1, # 1: Impressions
+            'RateType': 2, # 2: CPM
+            'IsFreqCap': True,  # TODO: think about options for freq cap
+            'FreqCap': campaign.maxdaily,
+            'FreqCapDuration': 1,
+            'FreqCapType': 2, # day
+        }
+
+        if flight:
+            for key, val in d.iteritems():
+                setattr(flight, key, val)
+            flight._send()
+        else:
+            d.update({'Name': campaign._fullname})
+            flight = adzerk.Flight.create(**d)
+            self.flights.append(flight)
+            self.flights_by_name[campaign._fullname] = flight
+            self.flights_by_campaign[flight.CampaignId].append(flight)
+        return flight
+
+
+    def make_map(self, link, campaign):
+        """Make a CreativeFlightMap.
+        
+        Map the the reddit link (adzerk Creative) and reddit campaign (adzerk
+        Flight).
+
+        """
+
+        az_creative = self.creatives_by_title[link._fullname]
+
+def reddit_to_adzerk(link, campaign):
+    """Convert reddit objects to adzerk objects.
+
+    reddit Link and PromoCampaign are converted to Adzerk Campaign, Creative,
+    Flight, and CreativeFlightMap.
+
+    """
+
+    az_campaign = _link_to_az_campaign(link)
+    az_creative = _link_to_az_creative(link)
+    az_flight = _campaign_to_az_flight(flight)
+
+    # Create map from link, campaign, az_campaign, az_creative, az_flight
+
+
+
 
 
 def get_adzerk_state():
