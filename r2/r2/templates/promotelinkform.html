@@ -51,6 +51,9 @@ ${unsafe(js.use('sponsored'))}
         }); 
     </script>
   %endif
+  <script type="text/javascript">
+	$(function() { update_bid("*[name=bid]"); }); 
+  </script>
 </%def>
 
 ${self.javascript_setup()}
