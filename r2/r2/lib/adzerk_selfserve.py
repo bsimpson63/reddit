@@ -99,19 +99,14 @@ def srname_to_keyword(srname):
 
 
 def render_link(link, campaign):
-    # Note that we have to pass the campaign so data-cid will be attached for
-    # internal tracking. If adzerk can send the FlightId(reddit campaign) then
-    # we can avoid this.
-    # Might want to render as json rather than HTML
-    c.user = FakeAccount()
-    c.site = Frontpage
-    b = IDBuilder([link._fullname])
-    r = b.get_items()
-    wrapped_link = r[0][0]
-    wrapped_link.num = ''
-    wrapped_link.campaign = campaign._fullname
-    rendered = spaceCompress(wrapped_link.render())
-    return rendered
+    author = Account._byID(link.author_id, data=True)
+    return {
+        'link': link._fullname,
+        'campaign': campaign._fullname,
+        'title': link.title,
+        'author': author.name,
+        'target': campaign.sr_name,
+    }
 
 
 class Adzerk(object):
