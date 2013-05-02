@@ -17,6 +17,7 @@ adzerk_advertiser_id = 20329    # self serve
 adzerk_priority_id = 21520
 adzerk_channel_id = 8186    # All sites
 adzerk_publisher_id = 9649
+adzerk_network_id = 5292
 
 """
 Required pieces:
