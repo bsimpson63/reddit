@@ -1,5 +1,6 @@
 from collections import defaultdict
 import datetime
+import json
 
 import adzerk
 
@@ -7,9 +8,7 @@ from pylons import c, g
 
 from r2.lib.filters import spaceCompress
 from r2.lib.utils import to36
-from r2.models import IDBuilder, Link
-from r2.models.account import FakeAccount
-from r2.models.subreddit import Frontpage
+from r2.models import Account, Link
 
 # Move to ini
 adzerk_site_id = 27843
@@ -100,13 +99,13 @@ def srname_to_keyword(srname):
 
 def render_link(link, campaign):
     author = Account._byID(link.author_id, data=True)
-    return {
+    return json.dumps({
         'link': link._fullname,
         'campaign': campaign._fullname,
         'title': link.title,
         'author': author.name,
         'target': campaign.sr_name,
-    }
+    })
 
 
 class Adzerk(object):
@@ -231,7 +230,7 @@ class Adzerk(object):
             'EndDate': date_to_adzerk(campaign.end_date),
             'Price': 1, # TODO
             'OptionType': 1, # 1: CPM, 2: Remainder
-            'Impressions': campaign.impressions,
+            'Impressions': getattr(campaign, 'impressions', 1000), # TODO: handle this
             'IsUnlimited': False,
             'IsFullSpeed': False,
             'Keywords': srname_to_keyword(campaign.sr_name),
@@ -242,7 +241,7 @@ class Adzerk(object):
             'GoalType': 1, # 1: Impressions
             'RateType': 2, # 2: CPM
             'IsFreqCap': True,  # TODO: think about options for freq cap
-            'FreqCap': campaign.maxdaily,
+            'FreqCap': getattr(campaign, 'maxdaily', 1000), # TODO: handle this
             'FreqCapDuration': 1,
             'FreqCapType': 2, # day
         }
@@ -284,7 +283,7 @@ class Adzerk(object):
             'Iframe': False,
             'Creative': {'Id': az_creative.Id},
             'FlightId': az_flight.Id,
-            'Impressions': campaign.impressions,
+            'Impressions': getattr(campaign, 'impressions', 1000), # TODO: handle this
             'IsDeleted': False,
             'IsActive': True,
         }
@@ -424,7 +423,7 @@ Mock out both with Stripe and with Authorize.net
 
 """
 # promotecontroller.py:
-
+"""
 
 def POST_update_pay():
     if g.authorizenetapi:
@@ -465,3 +464,4 @@ class AdzerkFlight(Base):
     # What do we want to use this for? If it's just a mapping of reddit thing to
     # adzerk thing then we can just add a data attribute to the reddit thing
 
+"""
