@@ -23,11 +23,14 @@
 
 from collections import OrderedDict
 from datetime import datetime, timedelta
+import math
+import random
 import re
 
 from pylons import g
 from sqlalchemy import func
 
+from r2.lib.utils import to_date
 from r2.models import traffic
 from r2.models.promo_metrics import PromoMetrics
 from r2.models.subreddit import DefaultSR
@@ -78,3 +81,38 @@ def _min_daily_pageviews_by_sr(ndays=NDAYS_TO_QUERY, end_date=None):
         if m:
             retval[m.group(1)] = row[1]
     return retval
+
+
+def fuzz_impressions(imps):
+    """Return imps rounded to one significant digit."""
+    if imps > 0:
+        ndigits = int(math.floor(math.log10(imps)))
+        return int(round(imps, -1 * ndigits)) # note the negative
+    else:
+        return 0
+
+
+def get_scheduled_impressions(sr_name, start_date, end_date):
+    # FIXME: mock function for development
+    start_date = to_date(start_date)
+    end_date = to_date(end_date)
+    ndays = (end_date - start_date).days
+    scheduled = OrderedDict()
+    for i in range(ndays):
+        date = (start_date + timedelta(i))
+        scheduled[date] = random.randint(0, 100) # FIXME: fakedata
+    return scheduled
+
+
+def get_available_impressions(sr_name, start_date, end_date, fuzzed=False):
+    # FIXME: mock function for development
+    start_date = to_date(start_date)
+    end_date = to_date(end_date)
+    available = get_predicted_by_date(sr_name, start_date, end_date)
+    scheduled = get_scheduled_impressions(sr_name, start_date, end_date)
+    for date in scheduled:
+        available[date] = int(available[date] - (available[date] * scheduled[date] / 100.)) # DELETEME
+        #available[date] = max(0, available[date] - scheduled[date]) # UNCOMMENTME
+        if fuzzed:
+            available[date] = fuzz_impressions(available[date])
+    return available
