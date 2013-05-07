@@ -2,6 +2,65 @@ function update_box(elem) {
    $(elem).prevAll('*[type="checkbox"]:first').prop('checked', true);
 };
 
+function get_ndays($form) {
+    return Math.round((Date.parse($form.find('*[name="enddate"]').val()) -
+                       Date.parse($form.find('*[name="startdate"]').val())) / (86400*1000))
+}
+
+function get_bid($form) {
+    return parseFloat($form.find('*[name="bid"]').val())
+}
+
+function get_cpm($form) {
+    return $form.find('*[name="cpm"]').val()
+}
+
+function fill_inputs() {
+    var $form = $("#campaign"),
+        bid = get_bid($form),
+        cpm = get_cpm($form),
+        ndays = get_ndays($form),
+        impressions = calc_impressions(bid, cpm);
+
+    $(".duration").html(ndays + ((ndays > 1) ? " days" : " day"))
+    $(".impression-info").html(pretty_number(impressions) + " impressions")
+    $(".price-info").html("$" + (cpm/100).toFixed(2) + " per 1000 impressions")
+}
+
+function on_date_change() {
+    fill_inputs()
+}
+
+function on_bid_change() {
+    fill_inputs()
+}
+
+function disable_form($form) {
+    $form.find('button[name="create"], button[name="save"]')
+        .prop("disabled", "disabled")
+        .addClass("disabled");
+}
+
+function enable_form($form) {
+    $form.find('button[name="create"], button[name="save"]')
+        .removeProp("disabled")
+        .removeClass("disabled");
+}
+
+function check_bid() {
+    var $form = $("#campaign"),
+        bid = get_bid($form),
+        minimum_bid = $("#bid").data("min_bid");
+
+    $(".minimum-spend").removeClass("error");
+    if (bid < minimum_bid) {
+        $(".minimum-spend").addClass("error");
+        disable_form($form)
+    } else {
+        enable_form($form)
+    }
+}
+
 function update_bid(elem) {
     var form = $(elem).parents(".campaign");
     var is_targeted = $("#targeting").prop("checked");
@@ -101,15 +160,11 @@ function check_enddate(startdate, enddate) {
 function targeting_on(elem) {
     $(elem).parents(".campaign").find(".targeting")
         .find('*[name="sr"]').prop("disabled", "").end().slideDown();
-
-    update_bid(elem);
 }
 
 function targeting_off(elem) {
     $(elem).parents(".campaign").find(".targeting")
         .find('*[name="sr"]').prop("disabled", "disabled").end().slideUp();
-
-    update_bid(elem);
 }
 
 (function($) {
@@ -134,14 +189,16 @@ function get_flag_class(flags) {
     return css_class
 }
 
-$.new_campaign = function(campaign_id36, start_date, end_date, duration, 
-                          bid, targeting, flags) {
+$.new_campaign = function(campaign_id36, start_date, end_date, duration,
+                          bid, cpm, speed, targeting, flags) {
     cancel_edit(function() {
       var data =('<input type="hidden" name="startdate" value="' + 
                  start_date +'"/>' + 
                  '<input type="hidden" name="enddate" value="' + 
                  end_date + '"/>' + 
                  '<input type="hidden" name="bid" value="' + bid + '"/>' +
+                 '<input type="hidden" name="cpm" value="' + cpm + '"/>' +
+                 '<input type="hidden" name="speed" value="' + speed + '"/>' +
                  '<input type="hidden" name="targeting" value="' + 
                  (targeting || '') + '"/>' +
                  '<input type="hidden" name="campaign_id36" value="' + campaign_id36 + '"/>');
@@ -153,7 +210,7 @@ $.new_campaign = function(campaign_id36, start_date, end_date, duration,
           data += ("<input type='hidden' name='view_live_url' value='" + 
                    flags.view_live_url + "'/>");
       }
-      var row = [start_date, end_date, duration, "$" + bid, targeting, data];
+      var row = [start_date, end_date, duration, "$" + bid, speed, targeting, data];
       $(".existing-campaigns .error").hide();
       var css_class = get_flag_class(flags);
       $(".existing-campaigns table").show()
@@ -165,8 +222,8 @@ $.new_campaign = function(campaign_id36, start_date, end_date, duration,
    return $;
 };
 
-$.update_campaign = function(campaign_id36, start_date, end_date, 
-                             duration, bid, targeting, flags) {
+$.update_campaign = function(campaign_id36, start_date, end_date,
+                             duration, bid, cpm, speed, targeting, flags) {
     cancel_edit(function() {
             $('.existing-campaigns input[name="campaign_id36"]')
                 .filter('*[value="' + (campaign_id36 || '0') + '"]')
@@ -176,12 +233,15 @@ $.update_campaign = function(campaign_id36, start_date, end_date,
                 .next().html(end_date)
                 .next().html(duration)
                 .next().html("$" + bid).removeClass()
+                .next().html(speed)
                 .next().html(targeting)
                 .next()
                 .find('*[name="startdate"]').val(start_date).end()
                 .find('*[name="enddate"]').val(end_date).end()
                 .find('*[name="targeting"]').val(targeting).end()
                 .find('*[name="bid"]').val(bid).end()
+                .find('*[name="cpm"]').val(cpm).end()
+                .find('*[name="speed"]').val(speed).end()
                 .find("button, span").remove();
             $.set_up_campaigns();
         });
@@ -199,10 +259,9 @@ $.set_up_campaigns = function() {
             var td = $(this).find("td:last");
             var bid_td = $(this).find("td:first").next().next().next()
                 .addClass("bid");
-            var target_td = $(this).find("td:nth-child(5)")
             if(td.length && ! td.children("button, span").length ) {
                 if(tr.hasClass("live")) {
-                    $(target_td).append($(view).addClass("view")
+                    $(td).append($(view).addClass("view fancybutton")
                             .click(function() { view_campaign(tr) }));
                 }
                 /* once paid, we shouldn't muck around with the campaign */
@@ -313,15 +372,20 @@ function edit_campaign(elem) {
                                 "css_class": "", "cells": [""]}], 
                     tr.rowIndex + 1);
             $("#edit-campaign-tr").children('td:first')
-                .attr("colspan", 6).append(campaign).end()
+                .attr("colspan", 7).append(campaign).end()
                 .prev().fadeOut(function() { 
                         var data_tr = $(this);
                         var c = $("#campaign");
-                        $.map(['startdate', 'enddate', 'bid', 'campaign_id36'], 
+                        $.map(['startdate', 'enddate', 'bid', 'cpm', 'campaign_id36'],
                               function(i) {
                                   i = '*[name="' + i + '"]';
                                   c.find(i).val(data_tr.find(i).val());
                               });
+                        /* check speed */
+                        var speed = data_tr.find('*[name="speed"]').val(),
+                            speed_radios = c.find('*[name="speed"]');
+                        speed_radios.filter('*[value="' + speed + '"]').prop("checked", "checked")
+
                         /* check if targeting is turned on */
                         var targeting = data_tr
                             .find('*[name="targeting"]').val();
@@ -343,7 +407,8 @@ function edit_campaign(elem) {
                         init_enddate();
                         c.find('button[name="save"]').show().end()
                             .find('button[name="create"]').hide().end();
-                        update_bid('*[name="bid"]');
+                        fill_inputs();
+                        check_bid();
                         c.fadeIn();
                     } );
             }
@@ -368,6 +433,7 @@ function create_campaign(elem) {
         return;
     }
     cancel_edit(function() {;
+            var base_cpm = $("#bid").data("base_cpm")
             init_startdate();
             init_enddate();
             $("#campaign")
@@ -379,8 +445,9 @@ function create_campaign(elem) {
                                 .prop("checked", "checked").end()
                 .find(".targeting").hide().end()
                 .find('*[name="sr"]').val("").prop("disabled", "disabled").end()
+                .find('input[name="cpm"]').val(base_cpm).end()
                 .fadeIn();
-            update_bid('*[name="bid"]');
+            on_date_change();
         });
 }
 
@@ -399,4 +466,17 @@ function pay_campaign(elem) {
 
 function view_campaign(elem) {
     $.redirect($(elem).find('input[name="view_live_url"]').val());
+}
+
+function pretty_number(number) {
+    var numberAsInt = parseInt(number)
+    if (numberAsInt) {
+        return numberAsInt.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+    } else {
+        return number
+    }
+}
+
+function calc_impressions(bid, cpm_pennies) {
+    return bid / cpm_pennies * 1000 * 100
 }

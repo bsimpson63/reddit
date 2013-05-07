@@ -4100,7 +4100,10 @@ ul.tabmenu.formtab {
     list-style-type: disc; 
     margin: 0 20px 10px; 
 }
-.existing-campaigns td > button { margin: 0px 5px 0px 0px;  }
+.existing-campaigns td > button {
+    margin: 2px;
+    padding: 2px 4px;
+}
 
 .campaign .bid-info { font-size: x-small; }
 .campaign .bid-info.error { color: red; }
@@ -4137,6 +4140,13 @@ ul.tabmenu.formtab {
     .linefield-content .infotext p {
         margin:  5px;
     }
+
+#campaign td,
+#campaign span,
+#campaign label,
+#campaign li {
+    font-size: small;
+}
 
 /***traffic stuff***/
 .traffic-table,
@@ -4769,7 +4779,12 @@ table.lined-table {
 }
 
 
-.create-promo { float: left; width: 520px; margin-right: 20px;} 
+.create-promo {
+    float: left;
+    width: 570px;
+    margin-right: 20px;
+}
+
 .create-promo .infobar { 
     margin-right: 0; 
     border-color: red;
@@ -4783,6 +4798,18 @@ table.lined-table {
     list-style-type: disc; 
 }
 .create-promo .rules { float:  left; margin-left:  15px; }
+
+.create-promo textarea,
+.create-promo input[type=text] {
+    width: 98%;
+}
+
+.create-promo {
+    .minimum-spend, .ndays, .inline {
+        display: inline;
+        padding: 10px;
+    }
+}
 
 .fancy-settings h1, .create-promotion h1 { font-size: 200%; color: #999; margin:10px 5px; }
 .fancy-settings h2 { font-size: 200%; font-weight:normal; color: #999; margin:10px 5px; }
