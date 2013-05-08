@@ -1,7 +1,3 @@
-function update_box(elem) {
-   $(elem).prevAll('*[type="checkbox"]:first').prop('checked', true);
-};
-
 function get_ndays($form) {
     return Math.round((Date.parse($form.find('*[name="enddate"]').val()) -
                        Date.parse($form.find('*[name="startdate"]').val())) / (86400*1000))
