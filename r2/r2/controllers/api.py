@@ -3380,3 +3380,36 @@ class ApiController(RedditController, OAuth2ResourceController):
             giftmessage=None,
             comment=comment._fullname,
         ))
+
+    def GET_fetch_trackers(self):
+        import hashlib
+
+        MAX_FULLNAME_LENGTH = 128
+        tracking_secret = g.tracking_secret
+
+        def jsonpify(callback_name, data):
+            data = callback_name + '(' + json.dumps(data) + ')'
+            #response = make_response(data)
+            #response.mimetype = 'text/javascript'
+            #return response
+            return data
+
+        ip = request.ip
+        jsonp_callback = request.get.get('callback', '')
+        ids = request.get.get('ids[]')
+        ids = ids.split(',') if ids else []
+
+        if len(ids) > 32:
+            self.abort404()
+
+        hashed = {}
+        for fullname in ids:
+            if len(fullname) > MAX_FULLNAME_LENGTH:
+                continue
+            text = ''.join((ip, fullname, tracking_secret))
+            hashed[fullname] = hashlib.sha1(text).hexdigest()
+        return jsonpify(jsonp_callback, hashed)
+
+    def GET_click_redirect(self):
+        destination = request.get.get('url').encode('utf-8')
+        return self.redirect(destination)

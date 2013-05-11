@@ -339,6 +339,9 @@ def make_map():
     # Used for showing ads
     mc("/ads/", controller="ad", action="ad")
 
+    mc("/fetch-trackers", controller="api", action="fetch_trackers")
+    mc("/click", controller="api", action="click_redirect")
+
     mc("/try", controller="forms", action="try_compact")
 
     # This route handles displaying the error page and
