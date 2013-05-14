@@ -57,6 +57,12 @@ def get_promote_srid(name = 'promos'):
 NO_TRANSACTION = 0
 
 class PromoCampaign(Thing):
+    date_fmt = '%Y-%m-%d %H:%M:%S:%f'
+
+    @classmethod
+    def date_to_str(cls, date):
+        return date.astimezone(g.tz).strftime(cls.date_fmt)
+
     def __getattr__(self, attr):
         val = Thing.__getattr__(self, attr)
         if attr in ('start_date', 'end_date'):
@@ -64,6 +70,17 @@ class PromoCampaign(Thing):
             if not val.tzinfo:
                 val = val.replace(tzinfo=g.tz)
         return val
+
+    def __setattr__(self, attr, val, make_dirty=True):
+        Thing.__setattr__(self, attr, val, make_dirty)
+        date_attr = {'start_date': 'start',
+                     'end_date': 'end'}.get(attr)
+        if date_attr:
+            if not getattr(val, 'tzinfo', None):
+                raise ValueError('PromoCampaign %s value %s not timezone aware'
+                                 % (attr, val))
+            date_str = self.date_to_str(val)
+            Thing.__setattr__(self, date_attr, date_str, make_dirty)
 
     @classmethod 
     def _new(cls, link, sr_name, bid, start_date, end_date):
@@ -93,6 +110,25 @@ class PromoCampaign(Thing):
         list if there are none.
         '''
         return cls._query(PromoCampaign.c.owner_id == account_id, data=True)
+
+    @classmethod
+    def _by_date(cls, start, end=None, link=None):
+        """Return list of campaigns active on date."""
+
+        def convert_date(date):
+            date = to_datetime(date)
+            if not date.tzinfo:
+                date = date.replace(tzinfo=g.tz)
+            return cls.date_to_str(date)
+
+        str_start = convert_date(start)
+        str_end = convert_date(end) if end else str_start
+
+        q = cls._query(cls.c.start <= str_end, cls.c.end > str_start, data=True)
+
+        if link:
+            q._filter(cls.c.link_id == link._id)
+        return list(q)
 
     def is_freebie(self):
         return self.trans_id < 0
