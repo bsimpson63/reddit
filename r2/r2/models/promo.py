@@ -155,6 +155,30 @@ class PromoCampaign(Thing):
         self._deleted = True
         self._commit()
 
+
+def backfill_dates():
+    from r2.lib.db.operators import desc
+    from r2.lib.utils import fetch_things2
+
+    q = PromoCampaign._query(data=True, sort=desc('_date'))
+    for camp in fetch_things2(q):
+        camp.start_date = camp.start_date
+        camp.end_date = camp.end_date
+        camp._commit()
+
+
+def verify_search(date):
+    from r2.models import PromotionWeights
+    promo_weights = PromotionWeights.get_campaigns(date)
+    campaigns = PromoCampaign._by_date(date)
+    pw_camps = {pw.promo_idx for pw in promo_weights}
+    pc_camps = {camp._id for camp in campaigns}
+    print 'Retrieved %s PromoCampaigns' % len(campaigns)
+    print 'Retrieved %s PromotionWeights' % len(promo_weights)
+    print 'Missing from PromoCampaign query: %s' % (pw_camps - pc_camps)
+    print 'Extras in PromoCampaign query: %s' % (pc_camps - pw_camps)
+
+
 class PromotionLog(tdb_cassandra.View):
     _use_db = True
     _connection_pool = 'main'
