@@ -3293,14 +3293,9 @@ class PromoAdminTool(Reddit):
         promo_info = {}
         scheduled = Promote_Graph.get_current_promos(start_date, 
                             end_date + datetime.timedelta(1))
-        campaign_ids = [x[1] for x in scheduled]
-        campaigns = PromoCampaign._byID(campaign_ids, data=True, return_dict=True)
-        account_ids = [pc.owner_id for pc in campaigns.itervalues()]
+        account_ids = [camp.owner_id for link, camp in scheduled]
         accounts = Account._byID(account_ids, data=True, return_dict=True)
-        for link, campaign_id, scheduled_start, scheduled_end in scheduled:
-            campaign = campaigns[campaign_id]
-            days = (campaign.end_date - campaign.start_date).days
-            bid_per_day = float(campaign.bid) / days
+        for link, campaign in scheduled:
             account = accounts[campaign.owner_id]
             promo_info[campaign._id] = { 
                 'username': account.name,
@@ -3309,7 +3304,7 @@ class PromoAdminTool(Reddit):
                 'link_fullname': link._fullname,
                 'campaign_start': campaign.start_date.strftime("%Y/%m/%d"),
                 'campaign_end': campaign.end_date.strftime("%Y/%m/%d"),
-                'bid_per_day': bid_per_day,
+                'bid_per_day': campaign.daily_bid,
             }            
         return promo_info 
 
@@ -3489,14 +3484,7 @@ class Promotion_Summary(Templated):
         authors = {}
         author_score = {}
         self.total = 0
-        for link, camp_id, s, e in Promote_Graph.get_current_promos(start_date, end_date):
-            # fetch campaign or skip to next campaign if it's not found
-            try:
-                campaign = PromoCampaign._byID(camp_id, data=True)
-            except NotFound:
-                g.log.error("Missing campaign (link: %d, camp_id: %d) omitted "
-                            "from promotion summary" % (link._id, camp_id))
-                continue
+        for link, campaign in Promote_Graph.get_current_promos(start_date, end_date):
 
             # get required attributes or skip to next campaign if any are missing.
             try:
@@ -3571,17 +3559,13 @@ class Promote_Graph(Templated):
     def promo_iter(cls, start_date, end_date, callback):
         size = (end_date - start_date).days
         current_promos = cls.get_current_promos(start_date, end_date)
-        campaign_ids = [camp_id for link, camp_id, s, e in current_promos]
-        campaigns = PromoCampaign._byID(campaign_ids, data=True)
-        for link, campaign_id, s, e in current_promos:
-            if campaign_id in campaigns:
-                campaign = campaigns[campaign_id]
-                sdate = campaign.start_date.date()
-                edate = campaign.end_date.date()
-                starti = max((sdate - start_date).days, 0)
-                endi = min((edate - start_date).days, size)
-                bid_day = campaign.bid / max((edate - sdate).days, 1)
-                callback(link, bid_day, starti, endi, campaign)
+        for link, campaign in current_promos:
+            sdate = campaign.start_date.date()
+            edate = campaign.end_date.date()
+            starti = max((sdate - start_date).days, 0)
+            endi = min((edate - start_date).days, size)
+            bid_day = campaign.bid / max((edate - sdate).days, 1)
+            callback(link, bid_day, starti, endi, campaign)
         
     @classmethod
     def get_current_promos(cls, start_date, end_date):
@@ -3597,9 +3581,7 @@ class Promote_Graph(Templated):
         promos = []
         for camp in campaigns:
             link = links_by_id[camp.link_id]
-            start = max(start_date, camp.start_date.date())
-            end = min(end_date, camp.end_date.date())
-            promos.append((link, camp._id, start, end))
+            promos.append((link, camp))
         return promos
 
     @classmethod
