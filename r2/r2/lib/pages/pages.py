@@ -24,7 +24,7 @@ from r2.lib.wrapped import Wrapped, Templated, CachedTemplate
 from r2.models import Account, FakeAccount, DefaultSR, make_feedurl
 from r2.models import FakeSubreddit, Subreddit, SubSR, AllMinus, AllSR
 from r2.models import Friends, All, Sub, NotFound, DomainSR, Random, Mod, RandomNSFW, RandomSubscription, MultiReddit, ModSR, Frontpage
-from r2.models import Link, Printable, Trophy, bidding, PromoCampaign, PromotionWeights, Comment
+from r2.models import Link, Printable, Trophy, bidding, PromoCampaign, Comment
 from r2.models import Flair, FlairTemplate, FlairTemplateBySubredditIndex
 from r2.models import USER_FLAIR, LINK_FLAIR
 from r2.models.promo import NO_TRANSACTION, PromotionLog
@@ -3585,23 +3585,53 @@ class Promote_Graph(Templated):
         
     @classmethod
     def get_current_promos(cls, start_date, end_date):
-        # grab promoted links
-        # returns a list of (thing_id, campaign_idx, start, end)
-        promos = PromotionWeights.get_schedule(start_date, end_date)
-        # sort based on the start date
-        promos.sort(key = lambda x: x[2])
-
-        # wrap the links
-        links = wrap_links([p[0] for p in promos])
+        campaigns = PromoCampaign._by_date(start_date, end=end_date)
+        campaigns.sort(key=lambda camp: camp.start_date)
+        links = Link._byID([camp.link_id for camp in campaigns], data=True,
+                           return_dict=False)
         # remove rejected/unpaid promos
-        links = dict((l._fullname, l) for l in links.things
-                     if promote.is_accepted(l) or promote.is_unapproved(l))
-        # filter promos accordingly
-        promos = [(links[thing_name], campaign_id, s, e) 
-                  for thing_name, campaign_id, s, e in promos
-                  if links.has_key(thing_name)]
-
+        links = [link for link in links if promote.is_accepted(link) or
+                                           promote.is_unapproved(link)]
+        wrapped_links = wrap_links(links)
+        links_by_id = {link._id: link for link in wrapped_links}
+        promos = []
+        for camp in campaigns:
+            link = links_by_id[camp.link_id]
+            start = max(start_date, camp.start_date.date())
+            end = min(end_date, camp.end_date.date())
+            promos.append((link, camp._id, start, end))
         return promos
+
+    @classmethod
+    @memoize('bid_history', time=10 * 60)
+    def bid_history(start_date, end_date):
+        """List of date, bid, refund totals"""
+        campaigns = PromoCampaign._by_date(start_date, end=end_date)
+        links = Link._byID([camp.link_id for camp in campaigns], date=True)
+        bids_by_date = defaultdict(int)
+        refunds_by_date = defaultdict(int)
+
+        for camp in campaigns:
+            link = links[camp.link_id]
+            if (promote.is_rejected(link) or promote.is_unpaid(link) or
+                link._deleted):
+                continue
+            start = max(start_date, camp.start_date)
+            end = min(end_date, camp.end_date)
+            ndays = (end - start).days
+            dates = [start + datetime.timedelta(days=i) for i in xrange(ndays)]
+            daily_refund = camp.daily_bid if camp.is_freebie else 0
+            for date in dates:
+                bids_by_date[date] += camp.daily_bid
+                refunds_by_date += daily_refund
+
+        ndays = (end_date - start_date).days
+        all_dates = [start_date + datetime.timedelta(days=i)
+                     for i in xrange(ndays)]
+        ret = []
+        for date in all_dates:
+            ret.append((date.date(), bids_by_date[date], refunds_by_date[date]))
+        return ret
 
     def __init__(self, start_date, end_date, bad_dates=None, admin_view=False):
         self.admin_view = admin_view and c.user_is_sponsor
@@ -3644,8 +3674,8 @@ class Promote_Graph(Templated):
                 else:
                     break
 
-        pool =PromotionWeights.bid_history(promote.promo_datetime_now(offset=-30),
-                                           promote.promo_datetime_now(offset=2))
+        pool = self.bid_history(promote.promo_datetime_now(offset=-30),
+                                promote.promo_datetime_now(offset=2))
 
         # graphs of impressions and clicks
         self.promo_traffic = promote.traffic_totals()

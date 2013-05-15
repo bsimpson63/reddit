@@ -514,8 +514,8 @@ def accept_promotion(link):
 
     set_promote_status(link, PROMOTE_STATUS.accepted)
     now = promo_datetime_now(0)
-    if link._fullname in set(l.thing_name for l in
-                             PromotionWeights.get_campaigns(now)):
+    make_live_now = bool(PromoCampaign._by_date(now, link=link))
+    if make_live_now:
         PromotionLog.add(link, 'Marked promotion for acceptance')
         charge_pending(0) # campaign must be charged before it will go live
         queue_changed_promo(link, "accepted")
@@ -551,27 +551,16 @@ def unapprove_promotion(link):
 
 def accepted_campaigns(offset=0):
     now = promo_datetime_now(offset=offset)
-    promo_weights = PromotionWeights.get_campaigns(now)
-    all_links = Link._by_fullname(set(x.thing_name for x in promo_weights),
-                                  data=True, return_dict=True)
-    accepted_links = {}
-    for link_fullname, link in all_links.iteritems():
-        if is_accepted(link):
-            accepted_links[link._id] = link
+    campaigns = PromoCampaign._by_date(now)
+    links = Link._byID(set(camp.link_id for camp in campaigns), data=True)
 
-    accepted_link_ids = accepted_links.keys()
-    campaign_query = PromoCampaign._query(PromoCampaign.c.link_id == accepted_link_ids,
-                                          data=True)
-    campaigns = dict((camp._id, camp) for camp in campaign_query)
-    for pw in promo_weights:
-        campaign = campaigns.get(pw.promo_idx)
-        if not campaign or not campaign.trans_id:
+    for camp in campaigns:
+        link = links[camp.link_id]
+        if not is_accepted(link):
             continue
-        link = accepted_links.get(campaign.link_id)
-        if not link:
+        if not camp.trans_id:
             continue
-
-        yield (link, campaign, pw.weight)
+        yield (link, camp, camp.daily_bid)
 
 def get_scheduled(offset=0):
     """
@@ -653,7 +642,7 @@ def charge_pending(offset=1):
 
 def scheduled_campaigns_by_link(l, date=None):
     # A promotion/campaign is scheduled/live if it's in
-    # PromotionWeights.get_campaigns(now) and
+    # PromoCampaign._by_date(now) and
     # authorize.is_charged_transaction()
 
     date = date or promo_datetime_now()
@@ -661,20 +650,11 @@ def scheduled_campaigns_by_link(l, date=None):
     if not is_accepted(l):
         return []
 
-    scheduled = PromotionWeights.get_campaigns(date)
-    campaigns = [c.promo_idx for c in scheduled if c.thing_name == l._fullname]
-
-    # Check authorize
+    campaigns = PromoCampaign._by_date(date, link=l)
     accepted = []
-    for campaign_id in campaigns:
-        try:
-            campaign = PromoCampaign._byID(campaign_id, data=True)
-            if authorize.is_charged_transaction(campaign.trans_id, campaign_id):
-                accepted.append(campaign_id)
-        except NotFound:
-            g.log.error("PromoCampaign %d scheduled to run on %s not found." %
-                          (campaign_id, date.strftime("%Y-%m-%d")))
-
+    for camp in campaigns:
+        if authorize.is_charged_transaction(camp.trans_id, camp._id):
+            accepted.append(camp._id)
     return accepted
 
 def promotion_key():
@@ -694,9 +674,11 @@ def set_live_promotions(weights):
     today = promo_datetime_now()
     yesterday = today - timedelta(days=1)
     tomorrow = today + timedelta(days=1)
-    promo_weights = PromotionWeights.get_campaigns(yesterday, tomorrow)
-    subreddit_names = set(p.sr_name for p in promo_weights)
+
+    campaigns = PromoCampaign._by_date(yesterday, end=tomorrow)
+    subreddit_names = set(camp.sr_name for camp in campaigns)
     subreddits = Subreddit._by_name(subreddit_names).values()
+
     # Set the default for those subreddits to no ads
     all_weights = {sr._id: [] for sr in subreddits}
 
