@@ -62,7 +62,6 @@ from r2.models import (
     PROMOTE_STATUS,
     PromotedLink,
     PromotionLog,
-    PromotionWeights,
     Subreddit,
 )
 from r2.models.keyvalue import NamedGlobals
@@ -377,7 +376,6 @@ def new_campaign(link, dates, bid, sr):
     # empty string for sr_name means target to all
     sr_name = sr.name if sr else ""
     campaign = PromoCampaign._new(link, sr_name, bid, dates[0], dates[1])
-    PromotionWeights.add(link, campaign._id, sr_name, dates[0], dates[1], bid)
     PromotionLog.add(link, 'campaign %s created' % campaign._id)
     author = Account._byID(link.author_id, True)
     if getattr(author, "complimentary_promos", False):
@@ -393,10 +391,6 @@ def edit_campaign(link, campaign, dates, bid, sr):
         # if the bid amount changed, cancel any pending transactions
         if campaign.bid != bid:
             void_campaign(link, campaign)
-
-        # update the schedule
-        PromotionWeights.reschedule(link, campaign._id, sr_name,
-                                    dates[0], dates[1], bid)
 
         # update values in the db
         campaign.update(dates[0], dates[1], bid, sr_name, campaign.trans_id, commit=True)
@@ -428,7 +422,6 @@ def complimentary(username, value=True):
     a._commit()
 
 def delete_campaign(link, campaign):
-    PromotionWeights.delete_unfinished(link, campaign._id)
     void_campaign(link, campaign)
     campaign.delete()
     PromotionLog.add(link, 'deleted campaign %s' % campaign._id)
