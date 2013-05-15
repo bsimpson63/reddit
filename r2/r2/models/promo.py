@@ -137,6 +137,11 @@ class PromoCampaign(Thing):
         now = datetime.now(g.tz)
         return self.start_date < now and self.end_date > now
 
+    @property
+    def daily_bid(self):
+        duration = max((self.end_date - self.start_date).days, 1)
+        return float(self.bid) / duration
+
     def update(self, start_date, end_date, bid, sr_name, trans_id, commit=True):
         self.start_date = start_date
         self.end_date = end_date
