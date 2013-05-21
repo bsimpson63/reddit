@@ -38,6 +38,7 @@ from r2.lib import (
     authorize,
     emailer,
     inventory,
+    hooks,
 )
 from r2.lib.db.queries import set_promote_status
 from r2.lib.memoize import memoize
@@ -447,6 +448,7 @@ def void_campaign(link, campaign):
     if bid_record:
         a = Account._byID(link.author_id)
         authorize.void_transaction(a, bid_record.transaction, campaign._id)
+    hooks.get_hook('campaign.void').call(campaign=campaign)
 
 def auth_campaign(link, campaign, user, pay_id):
     """
@@ -550,12 +552,15 @@ def reject_promotion(link, reason=None):
     if not c.user or c.user._id != link.author_id:
         emailer.reject_promo(link, reason=reason)
 
+    hooks.get_hook('promotion.void').call(link=link)
 
 
 def unapprove_promotion(link):
     PromotionLog.add(link, 'status update: unapproved')
     # update the query queue
     set_promote_status(link, PROMOTE_STATUS.unseen)
+    hooks.get_hook('promotion.void').call(link=link)
+
 
 def accepted_campaigns(offset=0):
     now = promo_datetime_now(offset=offset)
@@ -813,6 +818,8 @@ def make_daily_promotions(offset=0, test=False):
         _mark_promos_updated()
     else:
         print by_srid
+
+    hooks.get_hook('promote.make_daily_promotions').call(offset=offset)
 
     # after launching as many campaigns as possible, raise an exception to 
     #   report any error campaigns. (useful for triggering alerts in irc)
