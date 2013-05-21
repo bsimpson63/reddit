@@ -80,6 +80,15 @@ r.analytics = {
             'r': Math.round(Math.random() * 2147483647) // cachebuster
         })
 
+        var adServerPixel = new Image(),
+            adServerImpPixel = $el.data('adserver_imp_pixel'),
+            adServerClickUrl = $el.data('adserver_click_url')
+
+        if (adServerImpPixel) {
+          adServerPixel.src = adServerImpPixel
+          console.log('fetching adserver pixel: ' + adServerImpPixel)
+        }
+
         // If IE7/8 thinks the text of a link looks like an email address
         // (e.g. it has an @ in it), then setting the href replaces the
         // text as well. We'll store the original text and replace it to
@@ -90,7 +99,7 @@ r.analytics = {
             click_url = r.config.clicktracker_url + '?' + $.param({
             'id': trackingName,
             'hash': hash,
-            'url': dest
+            'url': adServerClickUrl || dest
         })
 
         save_href(link)

@@ -511,6 +511,8 @@ class CampaignBuilder(IDBuilder):
                          'campaign': t.campaign}) for t in tuples]
 
     def wrap_items(self, items):
+        from r2.lib.template_helpers import replace_render
+
         links = [i.thing for i in items]
         wrapped = IDBuilder.wrap_items(self, links)
         by_link = defaultdict(list)
@@ -520,6 +522,11 @@ class CampaignBuilder(IDBuilder):
         ret = []
         for i in items:
             w = by_link[i.thing._fullname].pop()
+            w.num = ''
+            if w.promoted is not None:
+                w.render_class = PromotedLink
+                w.rowstyle = 'promoted link'
+            w.render = replace_render(None, w, w.render)
             w.campaign = i.campaign
             w.weight = i.weight
             ret.append(w)

@@ -3049,13 +3049,11 @@ class ApiController(RedditController, OAuth2ResourceController):
     def GET_fetch_promo(self, link, campaign):
         promo_tuples = [promote.PromoTuple(link, 1., campaign)]
         builder = CampaignBuilder(promo_tuples,
-                                  wrap=default_thing_wrapper(),
                                   keep_fn=promote.is_promoted)
         promoted_links = builder.get_items()[0]
         if promoted_links:
-            s = SpotlightListing(promoted_links=promoted_links).listing()
-            item = s.things[0]
-            return spaceCompress(item.render())
+            w = promoted_links[0]
+            return spaceCompress(w.render())
 
 
     @noresponse(VUser(),
@@ -3380,6 +3378,18 @@ class ApiController(RedditController, OAuth2ResourceController):
             giftmessage=None,
             comment=comment._fullname,
         ))
+
+    @json_validate()
+    def POST_request_promo(self, responder):
+        selected_promo = promote.get_single_promo(c.user, c.site)
+        if not selected_promo:
+            return
+
+        ret = {
+            'link': selected_promo._fullname,
+            'campaign': selected_promo.campaign,
+        }
+        return ret
 
     def GET_fetch_trackers(self):
         import hashlib

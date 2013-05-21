@@ -49,6 +49,7 @@ from r2.models import (
     Account,
     AdWeight,
     Bid,
+    CampaignBuilder,
     DefaultSR,
     FakeAccount,
     FakeSubreddit,
@@ -695,6 +696,34 @@ def get_live_promotions(srids):
     return weights
 
 
+def srids_from_site(user, site):
+    if not isinstance(site, FakeSubreddit):
+        srids = set([site._id])
+    elif isinstance(site, MultiReddit):
+        srids = set(site.sr_ids)
+    elif user and not isinstance(user, FakeAccount):
+        srids = set(Subreddit.reverse_subscriber_ids(user) + [""])
+    else:
+        srids = set(Subreddit.user_subreddits(None, ids=True) + [""])
+    return srids
+
+
+def has_live_promos(user, site):
+    srids = srids_from_site(user, site)
+    weights = get_live_promotions(srids)
+    return [srid for srid, adweights in weights.iteritems() if adweights]
+
+
+def get_single_promo(user, site):
+    promo_tuples = lottery_promoted_links(user, site, n=10)
+    builder = CampaignBuilder(promo_tuples,
+                              keep_fn=keep_fresh_links)
+    promoted_links = builder.get_items()[0]
+    if promoted_links:
+        w = promoted_links[0]
+        return w
+
+
 def set_live_promotions(weights):
     start = time.time()
     # First, figure out which subreddits have had ads recently
@@ -796,15 +825,7 @@ PromoTuple = namedtuple('PromoTuple', ['link', 'weight', 'campaign'])
 
 
 def get_promotion_list(user, site):
-    if not isinstance(site, FakeSubreddit):
-        srids = set([site._id])
-    elif isinstance(site, MultiReddit):
-        srids = set(site.sr_ids)
-    elif user and not isinstance(user, FakeAccount):
-        srids = set(Subreddit.reverse_subscriber_ids(user) + [""])
-    else:
-        srids = set(Subreddit.user_subreddits(None, ids=True) + [""])
-
+    srids = srids_from_site(user, site)
     tuples = get_promotion_list_cached(srids)
     return [PromoTuple(*t) for t in tuples]
 
