@@ -31,6 +31,7 @@ import time
 
 from pylons import g, c
 from pylons.i18n import ungettext
+import requests
 
 from r2.lib.wrapped import Wrapped
 from r2.lib import (
@@ -713,6 +714,47 @@ def srids_from_site(user, site):
     return srids
 
 
+AdzerkResponse = namedtuple('AdzerkResponse',
+                    ['link', 'campaign', 'target', 'imp_pixel', 'click_url'])
+
+def adzerk_request(keywords, timeout=0.1):
+    data = {
+        "placements": [
+            {
+              "divName": "div1",
+              "networkId": g.adzerk_network_id,
+              "siteId": g.adzerk_site_id,
+              "adTypes": [4]
+            },
+          ],
+          'keywords': keywords,
+    }
+
+    url = 'http://engine.adzerk.net/api/v2'
+    headers = {'content-type': 'application/json'}
+
+    try:
+        r = requests.post(url, data=json.dumps(data), headers=headers,
+                          timeout=timeout)
+    except requests.exceptions.Timeout:
+        g.log.info('adzerk request timeout')
+        return None
+
+    response = json.loads(r.text)
+    decision = response['decisions']['div1']
+
+    if not decision:
+        return None
+
+    imp_pixel = decision['impressionUrl']
+    click_url = decision['clickUrl']
+    body = json.loads(decision['contents'][0]['body'])
+    campaign = body['campaign']
+    link = body['link']
+    target = body['target']
+    return AdzerkResponse(link, campaign, target, imp_pixel, click_url)
+
+
 def has_live_promos(user, site):
     srids = srids_from_site(user, site)
     weights = get_live_promotions(srids)
@@ -726,6 +768,35 @@ def get_single_promo(user, site):
     promoted_links = builder.get_items()[0]
     if promoted_links:
         w = promoted_links[0]
+        return w
+
+
+def get_adzerk_promo(user, site):
+    srids = has_live_promos(user, site)
+    if not srids:
+        return
+
+    if '' in srids:
+        srnames = [Frontpage.name]
+        srids.remove('')
+    else:
+        srnames = []
+
+    srs = Subreddit._byID(srids, data=True, return_dict=False)
+    srnames.extend([sr.name for sr in srs])
+    response = adzerk_request(srnames)
+
+    if not response:
+        return
+
+    promo_tuples = [PromoTuple(response.link, 1., response.campaign)]
+    builder = CampaignBuilder(promo_tuples,
+                              keep_fn=is_promoted)
+    promoted_links = builder.get_items()[0]
+    if promoted_links:
+        w = promoted_links[0]
+        w.adserver_imp_pixel = response.imp_pixel
+        w.adserver_click_url = response.click_url
         return w
 
 
