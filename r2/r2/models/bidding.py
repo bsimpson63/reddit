@@ -345,6 +345,9 @@ class Bid(Sessionized, Base):
     def refund(self):
         self.set_status(self.STATUS.REFUND)
 
+    def is_refund(self):
+        return (self.status == self.STATUS.REFUND)
+
 
 class PromotionWeights(Sessionized, Base):
     __tablename__ = "promotion_weight"
