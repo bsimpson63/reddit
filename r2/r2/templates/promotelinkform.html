@@ -39,6 +39,14 @@
 
 ${unsafe(js.use('sponsored'))}
 
+<%def name="javascript_setup()">
+<script type="text/javascript">
+  $(function() { fill_inputs(); }); 
+</script>
+</%def>
+
+${self.javascript_setup()}
+
 ## Create a datepicker for a form. min/maxDateSrc are the id of the
 ## element containing the min/max date - the '#' is added automatically
 ## here (as a workaround for babel message extraction not handling it
@@ -446,7 +454,7 @@ ${unsafe(js.use('sponsored'))}
               <button class="new-campaign fancybutton" 
                       ${'disabled="disabled"' if len(thing.campaigns) >= g.MAX_CAMPAIGNS_PER_LINK else ''}
                       title="${newcamp_title}"
-                      onclick="return create_campaign(this)">+ add new</button>
+                      onclick="return create_campaign()">+ add new</button>
             </th>
           </tr>
         </table>

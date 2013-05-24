@@ -389,7 +389,7 @@ function check_number_of_campaigns(){
     }
 }
 
-function create_campaign(elem) {
+function create_campaign() {
     if (check_number_of_campaigns()){
         return;
     }
@@ -408,7 +408,7 @@ function create_campaign(elem) {
                 .find('*[name="sr"]').val("").prop("disabled", "disabled").end()
                 .find('input[name="cpm"]').val(base_cpm).end()
                 .fadeIn();
-            on_date_change();
+            fill_inputs();
         });
 }
 
