@@ -466,7 +466,7 @@ def auth_campaign(link, campaign, user, pay_id):
     Returns: (True, "") if successful or (False, error_msg) if not. 
     """
     void_campaign(link, campaign)
-    test = 1 if g.debug else None
+    test = None
     trans_id, reason = authorize.auth_transaction(campaign.bid, user, pay_id,
                                                   link, campaign._id, test=test)
 
