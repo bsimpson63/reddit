@@ -128,8 +128,6 @@ class Globals(object):
             'wiki_max_page_name_length',
             'wiki_max_page_separators',
             'CPM_PENNIES',
-            'adzerk_network_id',
-            'adzerk_site_id',
         ],
 
         ConfigValue.float: [
