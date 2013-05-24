@@ -117,7 +117,8 @@ def promo_edit_url(l=None, id36=""):
     return "http://%s/promoted/edit_promo/%s" % (domain, id36)
 
 def pay_url(l, campaign):
-    return "%spromoted/pay/%s/%s" % (g.payment_domain, l._id36, campaign._id36)
+    domain = get_domain(cname=False, subreddit=False)
+    return "http://%s/promoted/pay/%s/%s" % (domain, l._id36, campaign._id36)
 
 def view_live_url(l, srname):
     url = get_domain(cname=False, subreddit=False)
