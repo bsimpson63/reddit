@@ -480,7 +480,7 @@ ${self.javascript_setup()}
 </%def>
 
 <%def name="right_panel()">
-  %if c.user_is_sponsor:
+  %if True:
     <div class="spacer bidding-history">
       %if thing.bids:
         <%utils:line_field title="${_('bidding history')}" css_class="rounded">
