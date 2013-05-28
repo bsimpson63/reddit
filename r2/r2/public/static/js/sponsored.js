@@ -250,7 +250,9 @@ $.set_up_campaigns = function() {
                     $(td).append(e).append(d);
                 }
                 else {
-                    $(td).append("<span class='info'>complete/live</span>");
+                    if (!tr.hasClass("live")) {
+                      $(td).append("<span class='info'>complete</span>");
+                    }
                     $(bid_td).addClass("paid")
                     /* sponsors can always edit */
                     if (tr.hasClass("sponsor")) {
