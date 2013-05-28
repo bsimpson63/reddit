@@ -516,16 +516,18 @@ class PromotedLinkTraffic(Templated):
         Templated.__init__(self)
 
     @classmethod
-    def make_campaign_table_row(cls, id, start, end, target, bid, impressions,
-                                clicks, is_live, is_active, url, is_total):
+    def make_campaign_table_row(cls, id, start, end, target, budget, spent,
+                                impressions, clicks, is_live, is_active, url,
+                                is_total):
+
         if impressions:
-            cpm = format_currency(promote.cost_per_mille(bid, impressions),
+            cpm = format_currency(promote.cost_per_mille(spent, impressions),
                                   'USD', locale=c.locale)
         else:
             cpm = '---'
 
         if clicks:
-            cpc = format_currency(promote.cost_per_click(bid, clicks), 'USD',
+            cpc = format_currency(promote.cost_per_click(spent, clicks), 'USD',
                                   locale=c.locale)
             ctr = format_number(_clickthrough_rate(impressions, clicks))
         else:
@@ -553,7 +555,8 @@ class PromotedLinkTraffic(Templated):
     def make_campaign_table(self):
         campaigns = PromoCampaign._by_link(self.thing._id)
 
-        total_bid = 0
+        total_budget = 0
+        total_spent = 0
         total_impressions = 0
         total_clicks = 0
 
@@ -575,16 +578,18 @@ class PromotedLinkTraffic(Templated):
             start = to_date(camp.start_date).strftime('%Y-%m-%d')
             end = to_date(camp.end_date).strftime('%Y-%m-%d')
             target = camp.sr_name or 'frontpage'
+            spent = promo.get_spent_amount(camp)
             is_active = self.campaign and self.campaign._id36 == camp._id36
             url = '/traffic/%s/%s' % (self.thing._id36, camp._id36)
             is_total = False
             row = self.make_campaign_table_row(camp._id36, start, end, target,
-                                               camp.bid, impressions, clicks,
-                                               is_live, is_active, url,
+                                               camp.bid, spent, impressions,
+                                               clicks, is_live, is_active, url,
                                                is_total)
             self.campaign_table.append(row)
 
-            total_bid += camp.bid
+            total_budget += camp.bid
+            total_spent += spent
             total_impressions += impressions
             total_clicks += clicks
 
@@ -597,9 +602,9 @@ class PromotedLinkTraffic(Templated):
         url = '/traffic/%s' % self.thing._id36
         is_total = True
         row = self.make_campaign_table_row(_('total'), start, end, target,
-                                           total_bid, total_impressions,
-                                           total_clicks, is_live, is_active,
-                                           url, is_total)
+                                           total_budget, total_spent,
+                                           total_impressions, total_clicks,
+                                           is_live, is_active, url, is_total)
         self.campaign_table.append(row)
 
     def check_dates(self, thing):
