@@ -231,12 +231,13 @@ def get_roadblocks():
 
 class RenderableCampaign():
     def __init__(self, campaign_id36, start_date, end_date, duration, bid,
-                 cpm, speed, sr, status):
+                 spent, cpm, speed, sr, status):
         self.campaign_id36 = campaign_id36
         self.start_date = start_date
         self.end_date = end_date
         self.duration = duration
         self.bid = bid
+        self.spent = spent
         self.cpm = cpm
         self.speed = speed
         self.sr = sr
@@ -257,6 +258,8 @@ class RenderableCampaign():
             duration = strings.time_label % dict(num=ndays,
                             time=ungettext("day", "days", ndays))
             bid = "%.2f" % camp.bid
+
+            spent = "%.2f" % get_spent_amount(camp)
             cpm = getattr(camp, 'cpm', g.CPM_PENNIES)
             serve_even = getattr(camp, 'serve_even', True)
             speed = 'even' if serve_even else 'fast'
@@ -275,7 +278,7 @@ class RenderableCampaign():
                 elif transaction.is_charged() or transaction.is_refund():
                     status['complete'] = True
 
-            rc = cls(campaign_id36, start_date, end_date, duration, bid,
+            rc = cls(campaign_id36, start_date, end_date, duration, bid, spent,
                      cpm, speed, sr, status)
             r.append(rc)
         return r

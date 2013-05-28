@@ -151,7 +151,7 @@ function get_flag_class(flags) {
 }
 
 $.new_campaign = function(campaign_id36, start_date, end_date, duration,
-                          bid, cpm, speed, targeting, flags) {
+                          bid, spent, cpm, speed, targeting, flags) {
     cancel_edit(function() {
       var data =('<input type="hidden" name="startdate" value="' + 
                  start_date +'"/>' + 
@@ -171,7 +171,7 @@ $.new_campaign = function(campaign_id36, start_date, end_date, duration,
           data += ("<input type='hidden' name='view_live_url' value='" + 
                    flags.view_live_url + "'/>");
       }
-      var row = [start_date, end_date, duration, "$" + bid, speed, targeting, data];
+      var row = [start_date, end_date, duration, "$" + bid, "$" + spent, speed, targeting, data];
       $(".existing-campaigns .error").hide();
       var css_class = get_flag_class(flags);
       $(".existing-campaigns table").show()
@@ -184,7 +184,7 @@ $.new_campaign = function(campaign_id36, start_date, end_date, duration,
 };
 
 $.update_campaign = function(campaign_id36, start_date, end_date,
-                             duration, bid, cpm, speed, targeting, flags) {
+                             duration, bid, spent, cpm, speed, targeting, flags) {
     cancel_edit(function() {
             $('.existing-campaigns input[name="campaign_id36"]')
                 .filter('*[value="' + (campaign_id36 || '0') + '"]')
@@ -194,6 +194,7 @@ $.update_campaign = function(campaign_id36, start_date, end_date,
                 .next().html(end_date)
                 .next().html(duration)
                 .next().html("$" + bid).removeClass()
+                .next().html("$" + spent)
                 .next().html(speed)
                 .next().html(targeting)
                 .next()
