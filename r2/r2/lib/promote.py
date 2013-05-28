@@ -24,6 +24,7 @@ from __future__ import with_statement
 
 from collections import OrderedDict, namedtuple
 from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_DOWN
 import json
 import math
 import random
@@ -66,6 +67,7 @@ from r2.models import (
     PromotionLog,
     PromotionWeights,
     Subreddit,
+    traffic,
 )
 from r2.models.keyvalue import NamedGlobals
 
@@ -922,6 +924,35 @@ def get_traffic_dates(thing):
     start, end = get_total_run(thing)
     end = min(now, end)
     return start, end
+
+
+def get_billable_impressions(campaign):
+    start, end = get_traffic_dates(campaign)
+    if start > datetime.now(g.tz):
+        return 0
+
+    traffic_lookup = traffic.TargetedImpressionsByCodename.promotion_history
+    imps = traffic_lookup(campaign._fullname, start.replace(tzinfo=None),
+                          end.replace(tzinfo=None))
+    billable_impressions = sum(imp for date, (imp,) in imps)
+    return billable_impressions
+
+
+def get_billable_amount(camp, impressions):
+    value_delivered = impressions / 1000. * camp.cpm / 100.
+    billable_amount = min(camp.bid, value_delivered)
+    return Decimal(billable_amount).quantize(Decimal('.01'),
+                                             rounding=ROUND_DOWN)
+
+
+def get_spent_amount(campaign):
+    if hasattr(campaign, 'refund_amount'):
+        # no need to calculate spend if we've already refunded
+        spent = campaign.bid - campaign.refund_amount
+    else:
+        billable_impressions = get_billable_impressions(campaign)
+        spent = get_billable_amount(campaign, billable_impressions)
+    return spent
 
 
 def Run(offset=0, verbose=True):
