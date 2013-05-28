@@ -333,6 +333,7 @@ class Bid(Sessionized, Base):
         return (self.status == self.STATUS.VOID)
 
     def charged(self):
+        self.charge = self.bid
         self.set_status(self.STATUS.CHARGE)
 
     def is_charged(self):
@@ -342,7 +343,10 @@ class Bid(Sessionized, Base):
         """
         return (self.status == self.STATUS.CHARGE)
 
-    def refund(self):
+    def refund(self, amount):
+        current_charge = self.charge or self.bid    # needed if charged() not
+                                                    # setting charge attr
+        self.charge = current_charge - amount
         self.set_status(self.STATUS.REFUND)
 
     def is_refund(self):
