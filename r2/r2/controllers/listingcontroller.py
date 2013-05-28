@@ -295,8 +295,13 @@ class HotController(FixListing, ListingController):
         frontpage_srs = []
         if c.user.pref_show_sponsors or not c.user.gold:
             if c.user_is_loggedin:
-                selected_promo = promote.get_single_promo(c.user, c.site)
-                promotion_prob = 0.5 if selected_promo else 0.
+                # loggedin gets a promo 50% of the time
+                if random.random() > 0.5:
+                    selected_promo = promote.get_single_promo(c.user, c.site)
+                    promotion_prob = 1.
+                else:
+                    promotion_prob = 0.
+                    selected_promo = None
             elif promote.has_live_promos(None, c.site):
                 selected_promo = None
                 promotion_prob = 1.
