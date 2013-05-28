@@ -491,7 +491,8 @@ ${self.javascript_setup()}
               <th>transaction id</th>
               <th>campaign id</th>
               <th>pay id</th>
-              <th>amount</th>
+              <th>bid</th>
+              <th>charge</th>
               <th>status</th>
             </tr>
             %for bid in thing.bids:
@@ -502,6 +503,7 @@ ${self.javascript_setup()}
                 <td>${bid.campaign}</td>
                 <td>${bid.pay_id}</td>
                 <td>${bid.amount_str}</td>
+                <td>${bid.charge_str}</td>
                 <td class="bid-status">${bid.status}</td>
               </tr>
             %endfor

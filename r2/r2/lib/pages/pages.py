@@ -3251,6 +3251,8 @@ class PromoteLinkForm(Templated):
                         pay_id=bid.pay_id,
                         amount_str=format_currency(bid.bid, 'USD',
                                                    locale=c.locale),
+                        charge_str=format_currency(bid.charge or bid.bid, 'USD',
+                                                   locale=c.locale),
                     )
                     self.bids.append(row)
 
