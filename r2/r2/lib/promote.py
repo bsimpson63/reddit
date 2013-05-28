@@ -664,6 +664,8 @@ def charge_pending(offset=1):
         except:
             print "Error on %s, campaign %s" % (l, camp._id)
 
+    hooks.get_hook('promote.charge_pending').call(offset=offset)
+
 
 def scheduled_campaigns_by_link(l, date=None):
     # A promotion/campaign is scheduled/live if it's in
