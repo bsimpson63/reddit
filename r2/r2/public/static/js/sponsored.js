@@ -336,7 +336,7 @@ function edit_campaign(elem) {
                                 "css_class": "", "cells": [""]}], 
                     tr.rowIndex + 1);
             $("#edit-campaign-tr").children('td:first')
-                .attr("colspan", 7).append(campaign).end()
+                .attr("colspan", 8).append(campaign).end()
                 .prev().fadeOut(function() { 
                         var data_tr = $(this);
                         var c = $("#campaign");
