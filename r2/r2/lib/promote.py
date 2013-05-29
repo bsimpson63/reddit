@@ -618,11 +618,10 @@ def get_scheduled(offset=0):
             error_campaigns.append((campaign._id, e))
     return by_sr, links, error_campaigns
 
-def fuzz_impressions(imps):
-    """Return imps rounded to one significant digit."""
+def fuzz_impressions(imps, multiple=500):
+    """Return imps rounded down to nearest multiple."""
     if imps > 0:
-        ndigits = int(math.floor(math.log10(imps)))
-        return int(round(imps, -1 * ndigits)) # note the negative
+        return int(multiple * math.floor(float(imps) / multiple))
     else:
         return 0
 

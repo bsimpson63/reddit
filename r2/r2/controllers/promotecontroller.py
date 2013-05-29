@@ -29,7 +29,7 @@ from pylons import c, g, request
 from pylons.i18n import _
 
 from r2.controllers.listingcontroller import ListingController
-from r2.lib import cssfilter, promote
+from r2.lib import cssfilter, inventory, promote
 from r2.lib.authorize import get_account_info, edit_profile, PROFILE_LIMIT
 from r2.lib.db import queries
 from r2.lib.errors import errors
@@ -54,6 +54,7 @@ from r2.lib.pages.things import wrap_links
 from r2.lib.system_messages import user_added_messages
 from r2.lib.utils import make_offset_date
 from r2.lib.validator import (
+    json_validate,
     nop,
     noresponse,
     ValidAddress,
@@ -265,6 +266,14 @@ class PromoteController(ListingController):
         if c.render_style == 'csv':
             return content.as_csv()
         return PromotePage("admingraph", content=content).render()
+
+    @json_validate(sr=VSubmitSR('sr', promotion=True),
+                   start=VDate('startdate'),
+                   end=VDate('enddate'))
+    def GET_impressions(self, responder, sr, start, end):
+        sr = sr or Frontpage
+        impressions = inventory.get_predicted_pageviews(sr, start, end)
+        return {'impressions': promote.fuzz_impressions(impressions)}
 
     # ## POST controllers below
     @validatedForm(VSponsorAdmin(),

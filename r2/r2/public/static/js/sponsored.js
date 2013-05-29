@@ -19,8 +19,40 @@ function fill_inputs() {
         impressions = calc_impressions(bid, cpm);
 
     $(".duration").html(ndays + ((ndays > 1) ? " days" : " day"))
-    $(".impression-info").html(pretty_number(impressions) + " impressions")
     $(".price-info").html("$" + (cpm/100).toFixed(2) + " per 1000 impressions")
+
+    check_impressions(impressions)
+}
+
+function check_impressions(requested) {
+  var $campaign = $('#campaign'),
+      startdate = $campaign.find('*[name="startdate"]').val(),
+      enddate = $campaign.find('*[name="enddate"]').val(),
+      targeted = $campaign.find('#targeting').attr('checked') == 'checked',
+      target = $campaign.find('*[name="sr"]').val(),
+      srname = targeted ? target : ''
+
+  $.ajax({
+      type: 'GET',
+      url: '/api/impressions.json',
+      data: {
+          sr: srname,
+          startdate: startdate,
+          enddate: enddate
+      },
+      success: function(data) {
+        var predicted = data.impressions,
+            message = pretty_number(requested) + " impressions"
+
+        if (predicted < requested) {
+          message += "<br>NOTE: Only " + pretty_number(predicted)
+          message += " impressions expected for your selected target and dates."
+          message += " To spend your entire budget consider extending the"
+          message += " duration or trying a new target."
+        }
+        $(".impression-info").html(message).show()
+      }
+  }) 
 }
 
 function on_date_change() {
