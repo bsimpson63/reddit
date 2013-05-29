@@ -8,7 +8,7 @@ function get_bid($form) {
 }
 
 function get_cpm($form) {
-    return $form.find('*[name="cpm"]').val()
+    return parseInt($form.find('*[name="cpm"]').val())
 }
 
 function fill_inputs() {
