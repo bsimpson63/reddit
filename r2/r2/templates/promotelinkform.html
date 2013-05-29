@@ -397,13 +397,16 @@ ${self.javascript_setup()}
         </script>
 
         <div class="targeting" style="display:none">
-          <ul>
-            <li>By targeting, your ad will only appear in front of users who subscribe to the subreddit that you specify.</li>
-            <li>Your ad will also appear at the top of the hot listing for that subreddit</li>
-            <li>You can only target one subreddit per campaign.  If you would like to submit to more than one subreddit, add a new campaign (its easy, you just fill this form out again).</li>
-          </ul>
           ${error_field("OVERSOLD", "sr", "div")}
           ${reddit_selector(thing.default_sr, thing.sr_searches, thing.subreddits)}
+        </div>
+
+        <div class="notes">
+          <ul>
+            <li>You will only be charged for the portion of your budget that is actually spent. Any unspent portion will be refunded.</li>
+            <li>By targeting, your ad will only appear in front of users who subscribe to the subreddit that you specify.</li>
+            <li>You can only target one subreddit per campaign.  If you would like to submit to more than one subreddit, add a new campaign (its easy, you just fill this form out again).</li>
+          </ul>
         </div>
 
         <div class="buttons">
