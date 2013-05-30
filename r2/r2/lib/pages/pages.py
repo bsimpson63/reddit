@@ -3276,6 +3276,10 @@ class PromoteLinkForm(Templated):
         self.sr_searches = simplejson.dumps(popular_searches())
         self.subreddits = (Subreddit.submit_sr_names(c.user) or
                            Subreddit.submit_sr_names(None))
+        srs = Subreddit._by_name(self.subreddits)
+        self.daily_traffic = {sr.name: inventory.min_daily_pageviews(sr)
+                              for sr in srs.itervalues()}
+        self.daily_traffic[''] = inventory.min_daily_pageviews(Frontpage)
         self.default_sr = (self.subreddits[0] if self.subreddits
                            else g.default_sr)
         self.link = promote.wrap_promoted(link)

@@ -28,9 +28,10 @@ import re
 from pylons import g
 from sqlalchemy import func
 
+from r2.lib.memoize import memoize
 from r2.models import traffic
 from r2.models.promo_metrics import PromoMetrics
-from r2.models.subreddit import DefaultSR
+from r2.models.subreddit import DefaultSR, Subreddit
 
 NDAYS_TO_QUERY = 14  # how much history to use in the estimate
 MIN_DAILY_CASS_KEY = 'min_daily_pageviews.GET_listing'
@@ -80,7 +81,9 @@ def _min_daily_pageviews_by_sr(ndays=NDAYS_TO_QUERY, end_date=None):
     return retval
 
 
+@memoize('min_daily_pageviews', time=60*60)
 def min_daily_pageviews(sr, ndays=NDAYS_TO_QUERY):
+    return 10000
     last_modified = traffic.get_traffic_last_modified()
     query_end = last_modified - datetime.timedelta(days=1)
     query_end = query_end.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -100,11 +103,3 @@ def min_daily_pageviews(sr, ndays=NDAYS_TO_QUERY):
         raise ValueError('Got weird traffic result for %s: %s' % (sr.name, r))
     else:
         return r[0][1]
-
-
-def get_predicted_pageviews(sr, start, end, ndays=14):
-    """Predict pageviews for sr based on recent minimum.."""
-    return (end - start).days * 10000
-    min_traffic = min_daily_pageviews(sr)
-    ndays = (end - start).days
-    return ndays * min_traffic

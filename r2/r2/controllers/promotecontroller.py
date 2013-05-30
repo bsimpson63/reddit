@@ -267,13 +267,11 @@ class PromoteController(ListingController):
             return content.as_csv()
         return PromotePage("admingraph", content=content).render()
 
-    @json_validate(sr=VSubmitSR('sr', promotion=True),
-                   start=VDate('startdate'),
-                   end=VDate('enddate'))
-    def GET_impressions(self, responder, sr, start, end):
+    @json_validate(sr=VSubmitSR('sr', promotion=True))
+    def GET_daily_impressions(self, responder, sr):
         sr = sr or Frontpage
-        impressions = inventory.get_predicted_pageviews(sr, start, end)
-        return {'impressions': promote.fuzz_impressions(impressions)}
+        impressions = inventory.min_daily_pageviews(sr)
+        return {'daily_impressions': promote.fuzz_impressions(impressions)}
 
     # ## POST controllers below
     @validatedForm(VSponsorAdmin(),

@@ -41,11 +41,12 @@ ${unsafe(js.use('sponsored'))}
 
 <%def name="javascript_setup()">
 <script type="text/javascript">
-  $(function() { fill_inputs(); }); 
+  r.sponsored.init();
+  r.sponsored.setup(
+    ${unsafe(simplejson.dumps(thing.daily_traffic))}
+  )
 </script>
 </%def>
-
-${self.javascript_setup()}
 
 ## Create a datepicker for a form. min/maxDateSrc are the id of the
 ## element containing the min/max date - the '#' is added automatically
@@ -109,6 +110,8 @@ ${self.javascript_setup()}
   </div>
   ${self.right_panel()}
 </div>
+
+${self.javascript_setup()}
 
 <%def name="title_field(link, editable=False)">
   <%utils:line_field title="${_('title')}" id="title-field" css_class="rounded">

@@ -21,38 +21,60 @@ function fill_inputs() {
     $(".duration").html(ndays + ((ndays > 1) ? " days" : " day"))
     $(".price-info").html("$" + (cpm/100).toFixed(2) + " per 1000 impressions")
 
-    check_impressions(impressions)
+    check_impressions()
 }
 
-function check_impressions(requested) {
+r.sponsored = {
+  init: function() {
+    $("#sr-autocomplete").on("sr-changed blur", function() { check_impressions() })
+  },
+
+  setup: function(daily_impressions) {
+    this.daily_impressions = daily_impressions
+  }
+}
+
+function get_daily_impressions(srname) {
+  return r.sponsored.daily_impressions[srname] || $.ajax({
+      type: 'GET',
+      url: '/api/daily_impressions.json',
+      data: {
+          sr: srname
+      },
+      success: function(data) {
+        r.sponsored.daily_impressions[srname] = data.daily_impressions
+      }
+    }).pipe(function(data) {
+      return data.daily_impressions
+    })
+}
+
+function check_impressions() {
   var $campaign = $('#campaign'),
+      bid = get_bid($campaign),
+      cpm = get_cpm($campaign),
+      requested = calc_impressions(bid, cpm),
       startdate = $campaign.find('*[name="startdate"]').val(),
       enddate = $campaign.find('*[name="enddate"]').val(),
+      ndays = get_ndays($campaign),
       targeted = $campaign.find('#targeting').attr('checked') == 'checked',
       target = $campaign.find('*[name="sr"]').val(),
       srname = targeted ? target : ''
 
-  $.ajax({
-      type: 'GET',
-      url: '/api/impressions.json',
-      data: {
-          sr: srname,
-          startdate: startdate,
-          enddate: enddate
-      },
-      success: function(data) {
-        var predicted = data.impressions,
-            message = pretty_number(requested) + " impressions"
+  $.when(get_daily_impressions(srname)).done(function(daily_impressions) {
+    var predicted = ndays * daily_impressions,
+        message = pretty_number(requested) + " impressions"
 
-        if (predicted < requested) {
-          message += "<br>NOTE: Only " + pretty_number(predicted)
-          message += " impressions expected for your selected target and dates."
-          message += " To spend your entire budget consider extending the"
-          message += " duration or trying a new target."
-        }
-        $(".impression-info").html(message).show()
-      }
-  }) 
+    console.log('requested: ' + requested + ' predicted: ' + predicted)
+
+    if (predicted < requested) {
+      message += "<br>NOTE: Only " + pretty_number(predicted)
+      message += " impressions expected for your selected target and dates."
+      message += " To spend your entire budget consider extending the"
+      message += " duration or trying a new target."
+    }
+    $(".impression-info").html(message).show()
+  })
 }
 
 function on_date_change() {
