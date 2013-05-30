@@ -42,7 +42,7 @@ ${unsafe(js.use('sponsored'))}
   <%pr:datepicker name="startdate" value="${thing.start.strftime('%m/%d/%Y')}"
     minDateSrc="date-min" initfuncname="init_startdate"
     min_date_offset="86400000">
-      function(elem) { check_enddate(elem, $("#enddate")); return elem; }
+      function(elem) { r.sponsored.check_enddate(elem, $("#enddate")); return elem; }
   </%pr:datepicker>
   &nbsp;&ndash;&nbsp;
   <%pr:datepicker name="enddate" value="${thing.end.strftime('%m/%d/%Y')}"
