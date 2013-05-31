@@ -42,9 +42,6 @@ ${unsafe(js.use('sponsored'))}
 <%def name="javascript_setup()">
 <script type="text/javascript">
   r.sponsored.init();
-  r.sponsored.setup(
-    ${unsafe(simplejson.dumps(thing.daily_traffic))}
-  )
 </script>
 </%def>
 

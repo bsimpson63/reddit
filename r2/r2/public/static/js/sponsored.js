@@ -3,10 +3,7 @@ r.sponsored = {
     $("#sr-autocomplete").on("sr-changed blur", function() {
       r.sponsored.fill_inputs()
     })
-  },
 
-  setup: function(daily_impressions) {
-    r.sponsored.daily_impressions = daily_impressions
     r.sponsored.inventory = {}
   },
 
@@ -32,53 +29,10 @@ r.sponsored = {
 
       $(".duration").html(ndays + ((ndays > 1) ? " days" : " day"))
       $(".price-info").html("$" + (cpm/100).toFixed(2) + " per 1,000 impressions")
+      $(".impression-info").html(r.sponsored.pretty_number(impressions) + " impressions")
 
       r.sponsored.check_bid()
-      r.sponsored.check_impressions()
       r.sponsored.check_inventory()
-  },
-
-  get_daily_impressions: function(srname) {
-    return r.sponsored.daily_impressions[srname] || $.ajax({
-        type: 'GET',
-        url: '/api/daily_impressions.json',
-        data: {
-            sr: srname
-        },
-        success: function(data) {
-          r.sponsored.daily_impressions[srname] = data.daily_impressions
-        }
-      }).pipe(function(data) {
-        return data.daily_impressions
-      })
-  },
-
-  check_impressions: function() {
-    var $campaign = $('#campaign'),
-        bid = r.sponsored.get_bid($campaign),
-        cpm = r.sponsored.get_cpm($campaign),
-        requested = r.sponsored.calc_impressions(bid, cpm),
-        startdate = $campaign.find('*[name="startdate"]').val(),
-        enddate = $campaign.find('*[name="enddate"]').val(),
-        ndays = r.sponsored.get_ndays($campaign),
-        targeted = $campaign.find('#targeting').attr('checked') == 'checked',
-        target = $campaign.find('*[name="sr"]').val(),
-        srname = targeted ? target : ''
-
-    $.when(r.sponsored.get_daily_impressions(srname)).done(function(daily_impressions) {
-      var predicted = ndays * daily_impressions,
-          message = r.sponsored.pretty_number(requested) + " impressions"
-
-      console.log('requested: ' + requested + ' predicted: ' + predicted)
-
-      if (predicted < requested) {
-        message += "<br>NOTE: Only " + r.sponsored.pretty_number(predicted)
-        message += " impressions expected for your selected target and dates."
-        message += " To spend your entire budget consider extending the"
-        message += " duration or trying a new target."
-      }
-      $(".impression-info").html(message).show()
-    })
   },
 
   get_check_inventory: function(srname, startdate, enddate) {
