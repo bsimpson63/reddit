@@ -6,7 +6,7 @@ r.sponsored = {
   },
 
   setup: function(daily_impressions) {
-    this.daily_impressions = daily_impressions
+    r.sponsored.daily_impressions = daily_impressions
   },
 
   get_ndays: function($form) {
@@ -24,10 +24,10 @@ r.sponsored = {
 
   fill_inputs: function() {
       var $form = $("#campaign"),
-          bid = this.get_bid($form),
-          cpm = this.get_cpm($form),
-          ndays = this.get_ndays($form),
-          impressions = this.calc_impressions(bid, cpm);
+          bid = r.sponsored.get_bid($form),
+          cpm = r.sponsored.get_cpm($form),
+          ndays = r.sponsored.get_ndays($form),
+          impressions = r.sponsored.calc_impressions(bid, cpm);
 
       $(".duration").html(ndays + ((ndays > 1) ? " days" : " day"))
       $(".price-info").html("$" + (cpm/100).toFixed(2) + " per 1,000 impressions")
@@ -36,14 +36,14 @@ r.sponsored = {
   },
 
   get_daily_impressions: function(srname) {
-    return this.daily_impressions[srname] || $.ajax({
+    return r.sponsored.daily_impressions[srname] || $.ajax({
         type: 'GET',
         url: '/api/daily_impressions.json',
         data: {
             sr: srname
         },
         success: function(data) {
-          this.daily_impressions[srname] = data.daily_impressions
+          r.sponsored.daily_impressions[srname] = data.daily_impressions
         }
       }).pipe(function(data) {
         return data.daily_impressions
@@ -52,17 +52,17 @@ r.sponsored = {
 
   check_impressions: function() {
     var $campaign = $('#campaign'),
-        bid = this.get_bid($campaign),
-        cpm = this.get_cpm($campaign),
-        requested = this.calc_impressions(bid, cpm),
+        bid = r.sponsored.get_bid($campaign),
+        cpm = r.sponsored.get_cpm($campaign),
+        requested = r.sponsored.calc_impressions(bid, cpm),
         startdate = $campaign.find('*[name="startdate"]').val(),
         enddate = $campaign.find('*[name="enddate"]').val(),
-        ndays = this.get_ndays($campaign),
+        ndays = r.sponsored.get_ndays($campaign),
         targeted = $campaign.find('#targeting').attr('checked') == 'checked',
         target = $campaign.find('*[name="sr"]').val(),
         srname = targeted ? target : ''
 
-    $.when(this.get_daily_impressions(srname)).done(function(daily_impressions) {
+    $.when(r.sponsored.get_daily_impressions(srname)).done(function(daily_impressions) {
       var predicted = ndays * daily_impressions,
           message = r.sponsored.pretty_number(requested) + " impressions"
 
@@ -79,11 +79,11 @@ r.sponsored = {
   },
 
   on_date_change: function() {
-      this.fill_inputs()
+      r.sponsored.fill_inputs()
   },
 
   on_bid_change: function() {
-      this.fill_inputs()
+      r.sponsored.fill_inputs()
   },
 
   disable_form: function($form) {
@@ -100,15 +100,15 @@ r.sponsored = {
 
   check_bid: function() {
       var $form = $("#campaign"),
-          bid = this.get_bid($form),
+          bid = r.sponsored.get_bid($form),
           minimum_bid = $("#bid").data("min_bid");
 
       $(".minimum-spend").removeClass("error");
       if (bid < minimum_bid) {
           $(".minimum-spend").addClass("error");
-          this.disable_form($form)
+          r.sponsored.disable_form($form)
       } else {
-          this.enable_form($form)
+          r.sponsored.enable_form($form)
       }
   },
 
