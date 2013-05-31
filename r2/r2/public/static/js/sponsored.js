@@ -1,7 +1,7 @@
 r.sponsored = {
   init: function() {
     $("#sr-autocomplete").on("sr-changed blur", function() {
-      this.check_impressions()
+      r.sponsored.check_impressions()
     })
   },
 
