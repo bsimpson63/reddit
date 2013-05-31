@@ -1,12 +1,13 @@
 r.sponsored = {
   init: function() {
     $("#sr-autocomplete").on("sr-changed blur", function() {
-      r.sponsored.check_impressions()
+      r.sponsored.fill_inputs()
     })
   },
 
   setup: function(daily_impressions) {
     r.sponsored.daily_impressions = daily_impressions
+    r.sponsored.inventory = {}
   },
 
   get_ndays: function($form) {
@@ -32,7 +33,9 @@ r.sponsored = {
       $(".duration").html(ndays + ((ndays > 1) ? " days" : " day"))
       $(".price-info").html("$" + (cpm/100).toFixed(2) + " per 1,000 impressions")
 
+      r.sponsored.check_bid()
       r.sponsored.check_impressions()
+      r.sponsored.check_inventory()
   },
 
   get_daily_impressions: function(srname) {
@@ -76,6 +79,69 @@ r.sponsored = {
       }
       $(".impression-info").html(message).show()
     })
+  },
+
+  get_check_inventory: function(srname, startdate, enddate) {
+    var key = srname + startdate + enddate
+    return r.sponsored.inventory[key] || $.ajax({
+        type: 'GET',
+        url: '/api/check_inventory.json',
+        data: {
+            sr: srname,
+            startdate: startdate,
+            enddate: enddate
+        },
+        success: function(data) {
+          r.sponsored.inventory[key] = data.inventory
+        }
+      }).pipe(function(data) {
+        return data.inventory
+      })
+  },
+
+  check_inventory: function() {
+    var $campaign = $('#campaign'),
+        bid = r.sponsored.get_bid($campaign),
+        cpm = r.sponsored.get_cpm($campaign),
+        requested = r.sponsored.calc_impressions(bid, cpm),
+        startdate = $campaign.find('*[name="startdate"]').val(),
+        enddate = $campaign.find('*[name="enddate"]').val(),
+        ndays = r.sponsored.get_ndays($campaign),
+        daily_request = Math.floor(requested / ndays),
+        targeted = $campaign.find('#targeting').attr('checked') == 'checked',
+        target = $campaign.find('*[name="sr"]').val(),
+        srname = targeted ? target : ''
+
+        $.when(r.sponsored.get_check_inventory(srname, startdate, enddate)).done(
+          function(target_inventory) {
+            var oversold = {}
+            for (var date in target_inventory) {
+              var available = target_inventory[date]
+              if (available < daily_request) {
+                oversold[date] = available
+              }
+            }
+
+            if (!$.isEmptyObject(oversold)) {
+              var dates = Object.keys(oversold)
+              var message = "We have insufficient inventory to fulfill your requested"
+              message += " budget, target, and dates."
+              message += " (requested " + r.sponsored.pretty_number(daily_request)
+              message += " impressions per day, " + r.sponsored.pretty_number(oversold[dates[0]])
+              message += " available on " + dates[0]
+              for (var index in dates.slice(1)) {
+                var date = dates[index],
+                    available = oversold[date]
+                message += ", " + r.sponsored.pretty_number(available) + " available on " + date
+              }
+              message += ")"
+              $(".OVERSOLD_DETAIL").html(message).show()
+              r.sponsored.disable_form($campaign)
+            } else {
+              $(".OVERSOLD_DETAIL").hide()
+              r.sponsored.enable_form($campaign)
+            }
+          })
   },
 
   on_date_change: function() {
@@ -299,7 +365,6 @@ r.sponsored = {
                           c.find('button[name="save"]').show().end()
                               .find('button[name="create"]').hide().end();
                           r.sponsored.fill_inputs();
-                          r.sponsored.check_bid();
                           c.fadeIn();
                       } );
               }

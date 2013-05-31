@@ -299,7 +299,7 @@ def make_map():
                                  "traffic_viewer|rm_traffic_viewer|"
                                  "edit_campaign|delete_campaign|meta_promo|"
                                  "add_roadblock|rm_roadblock|"
-                                 "daily_impressions")))
+                                 "daily_impressions|check_inventory")))
     mc('/api/:action', controller='apiminimal',
        requirements=dict(action="new_captcha"))
     mc('/api/:type', controller='api',

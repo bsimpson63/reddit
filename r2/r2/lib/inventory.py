@@ -29,7 +29,13 @@ from pylons import g
 from sqlalchemy import func
 
 from r2.lib.memoize import memoize
-from r2.models import traffic
+from r2.lib.utils import to_date
+from r2.models import (
+    PromoCampaign,
+    PromotionWeights,
+    NO_TRANSACTION,
+    traffic,
+)
 from r2.models.promo_metrics import PromoMetrics
 from r2.models.subreddit import DefaultSR, Subreddit
 
@@ -103,3 +109,46 @@ def min_daily_pageviews(sr, ndays=NDAYS_TO_QUERY):
         raise ValueError('Got weird traffic result for %s: %s' % (sr.name, r))
     else:
         return r[0][1]
+
+
+def get_date_range(start, end):
+    start, end = filter(to_date, [start, end])
+    dates = [start + timedelta(i) for i in xrange((end - start).days)]
+    return dates
+
+def get_sold_pageviews(sr, start, end):
+    sr_name = '' if isinstance(sr, DefaultSR) else sr.name
+    dates = set(get_date_range(start, end))
+
+    q = (PromotionWeights.query()
+                .filter(PromotionWeights.sr_name == sr_name)
+                .filter(PromotionWeights.date.in_(dates)))
+    promo_weights = list(q)
+    campaigns = PromoCampaign._byID([pw.promo_idx for pw in promo_weights],
+                                    data=True, return_dict=False)
+
+    r = dict.fromkeys(dates, 0)
+    for camp in campaigns:
+        if camp.trans_id == NO_TRANSACTION:
+            continue
+        ndays = (camp.end_date - camp.start_date).days
+        daily_impressions = camp.impressions / ndays
+        camp_dates = set(get_date_range(camp.start_date, camp.end_date))
+        for date in camp_dates.intersection(dates):
+            r[date] += daily_impressions
+    return r
+
+
+def get_available_pageviews(sr, start, end):
+    daily_available = min_daily_pageviews(sr)
+    sold_by_date = get_sold_pageviews(sr, start, end)
+    return {date.strftime('%m/%d/%Y'): max(0, daily_available - sold)
+            for date, sold in sold_by_date.iteritems()}
+
+def get_oversold(sr, start, end, daily_request):
+    available_by_date = get_available_pageviews(sr, start, end)
+    oversold = {}
+    for date, available in available_by_date.iteritems():
+        if available < daily_request:
+            oversold[date] = available
+    return oversold

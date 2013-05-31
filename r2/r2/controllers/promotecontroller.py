@@ -21,6 +21,7 @@
 ###############################################################################
 from datetime import datetime, timedelta
 
+from babel.numbers import format_number
 import itertools
 import json
 import urllib
@@ -52,7 +53,7 @@ from r2.lib.pages import (
 from r2.lib.pages.trafficpages import TrafficViewerList
 from r2.lib.pages.things import wrap_links
 from r2.lib.system_messages import user_added_messages
-from r2.lib.utils import make_offset_date
+from r2.lib.utils import make_offset_date, to_date
 from r2.lib.validator import (
     json_validate,
     nop,
@@ -243,6 +244,14 @@ class PromoteController(ListingController):
             return self.abort404()
         link = Link._byID(campaign.link_id)
         return self.redirect(promote.promo_edit_url(link))
+
+    @json_validate(sr=VSubmitSR('sr', promotion=True),
+                   start=VDate('startdate'),
+                   end=VDate('enddate'))
+    def GET_check_inventory(self, responder, sr, start, end):
+        sr = sr or Frontpage
+        available_by_date = inventory.get_available_pageviews(sr, start, end)
+        return {'inventory': available_by_date}
 
     @validate(VSponsor(),
               dates=VDateRange(["startdate", "enddate"],
@@ -533,6 +542,24 @@ class PromoteController(ListingController):
                 return
         if targeting == 'none':
             sr = None
+
+        # Check inventory
+        ndays = (to_date(end) - to_date(start)).days
+        total_request = bid / float(cpm) * 1000
+        daily_request = 20000
+        oversold = inventory.get_oversold(sr or Frontpage, start, end,
+                                          daily_request)
+        if oversold:
+            available = [('%s available on %s'
+                          % (format_number(av, locale=c.locale), d))
+                         for d, av in oversold.iteritems()]
+            msg_params = {'daily_request': format_number(daily_request,
+                                                         locale=c.locale),
+                          'available': ', '.join(available)}
+            c.errors.add(errors.OVERSOLD_DETAIL, field='bid',
+                         msg_params=msg_params)
+            form.has_errors('bid', errors.OVERSOLD_DETAIL)
+            return
 
         if campaign_id36 is not None:
             campaign = PromoCampaign._byID36(campaign_id36)
