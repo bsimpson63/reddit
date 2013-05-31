@@ -255,11 +255,13 @@ r.sponsored = {
   targeting_on: function(elem) {
       $(elem).parents(".campaign").find(".targeting")
           .find('*[name="sr"]').prop("disabled", "").end().slideDown();
+      r.sponsored.fill_inputs()
   },
 
   targeting_off: function(elem) {
       $(elem).parents(".campaign").find(".targeting")
           .find('*[name="sr"]').prop("disabled", "disabled").end().slideUp();
+      r.sponsored.fill_inputs()
   },
 
   detach_campaign_form: function() {
