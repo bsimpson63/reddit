@@ -32,7 +32,7 @@ r.sponsored = {
       $(".duration").html(ndays + ((ndays > 1) ? " days" : " day"))
       $(".price-info").html("$" + (cpm/100).toFixed(2) + " per 1,000 impressions")
 
-      this.check_impressions()
+      r.sponsored.check_impressions()
   },
 
   get_daily_impressions: function(srname) {
