@@ -30,7 +30,7 @@ r.sponsored = {
           impressions = this.calc_impressions(bid, cpm);
 
       $(".duration").html(ndays + ((ndays > 1) ? " days" : " day"))
-      $(".price-info").html("$" + (cpm/100).toFixed(2) + " per 1000 impressions")
+      $(".price-info").html("$" + (cpm/100).toFixed(2) + " per 1,000 impressions")
 
       this.check_impressions()
   },
