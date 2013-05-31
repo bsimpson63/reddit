@@ -324,23 +324,6 @@ ${self.javascript_setup()}
           </tr>
 
           <tr>
-            <th>delivery speed</th>
-            <td class="prefright">
-              <label>
-                <input id="even_speed" class="nomargin" 
-                       type="radio"  value="even" name="speed"
-                       checked="checked" /> 
-                even (distribute impressions across entire duration)
-              </label>
-              <br />
-              <label>
-                <input id="fast_speed" class="nomargin" 
-                       type="radio"  value="fast" name="speed" /> 
-                fast (serve impressions as fast as possible)
-              </label>
-          </tr>
-
-          <tr>
             <th>price</th>
             <td class="prefright">
               <input id="cpm" name="cpm" type="hidden">
@@ -452,7 +435,6 @@ ${self.javascript_setup()}
             <th>duration</th>
             <th>total budget</th>
             <th>spent</th>
-            <th>delivery speed</th>
             <th title="${targeting_title}">targeting</th>
             <th style="align:right">
               <button class="new-campaign fancybutton" 
@@ -468,7 +450,7 @@ ${self.javascript_setup()}
               %for rc in sorted(thing.campaigns, key=lambda rc: rc.start_date):
                 $.new_campaign(${unsafe(','.join(simplejson.dumps(attr) for attr in
                     [rc.campaign_id36, rc.start_date, rc.end_date, rc.duration,
-                     rc.bid, rc.spent, rc.cpm, rc.speed, rc.sr, rc.status]))});
+                     rc.bid, rc.spent, rc.cpm, rc.sr, rc.status]))});
               %endfor
               $.set_up_campaigns();
             });

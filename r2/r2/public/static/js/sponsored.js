@@ -285,7 +285,7 @@ r.sponsored = {
                                   "css_class": "", "cells": [""]}], 
                       tr.rowIndex + 1);
               $("#edit-campaign-tr").children('td:first')
-                  .attr("colspan", 8).append(campaign).end()
+                  .attr("colspan", 7).append(campaign).end()
                   .prev().fadeOut(function() { 
                           var data_tr = $(this);
                           var c = $("#campaign");
@@ -294,10 +294,6 @@ r.sponsored = {
                                     i = '*[name="' + i + '"]';
                                     c.find(i).val(data_tr.find(i).val());
                                 });
-                          /* check speed */
-                          var speed = data_tr.find('*[name="speed"]').val(),
-                              speed_radios = c.find('*[name="speed"]');
-                          speed_radios.filter('*[value="' + speed + '"]').prop("checked", "checked")
 
                           /* check if targeting is turned on */
                           var targeting = data_tr
@@ -404,7 +400,7 @@ function get_flag_class(flags) {
 }
 
 $.new_campaign = function(campaign_id36, start_date, end_date, duration,
-                          bid, spent, cpm, speed, targeting, flags) {
+                          bid, spent, cpm, targeting, flags) {
     r.sponsored.cancel_edit(function() {
       var data =('<input type="hidden" name="startdate" value="' + 
                  start_date +'"/>' + 
@@ -412,7 +408,6 @@ $.new_campaign = function(campaign_id36, start_date, end_date, duration,
                  end_date + '"/>' + 
                  '<input type="hidden" name="bid" value="' + bid + '"/>' +
                  '<input type="hidden" name="cpm" value="' + cpm + '"/>' +
-                 '<input type="hidden" name="speed" value="' + speed + '"/>' +
                  '<input type="hidden" name="targeting" value="' + 
                  (targeting || '') + '"/>' +
                  '<input type="hidden" name="campaign_id36" value="' + campaign_id36 + '"/>');
@@ -424,7 +419,7 @@ $.new_campaign = function(campaign_id36, start_date, end_date, duration,
           data += ("<input type='hidden' name='view_live_url' value='" + 
                    flags.view_live_url + "'/>");
       }
-      var row = [start_date, end_date, duration, "$" + bid, "$" + spent, speed, targeting, data];
+      var row = [start_date, end_date, duration, "$" + bid, "$" + spent, targeting, data];
       $(".existing-campaigns .error").hide();
       var css_class = get_flag_class(flags);
       $(".existing-campaigns table").show()
@@ -437,7 +432,7 @@ $.new_campaign = function(campaign_id36, start_date, end_date, duration,
 };
 
 $.update_campaign = function(campaign_id36, start_date, end_date,
-                             duration, bid, spent, cpm, speed, targeting, flags) {
+                             duration, bid, spent, cpm, targeting, flags) {
     r.sponsored.cancel_edit(function() {
             $('.existing-campaigns input[name="campaign_id36"]')
                 .filter('*[value="' + (campaign_id36 || '0') + '"]')
@@ -448,7 +443,6 @@ $.update_campaign = function(campaign_id36, start_date, end_date,
                 .next().html(duration)
                 .next().html("$" + bid).removeClass()
                 .next().html("$" + spent)
-                .next().html(speed)
                 .next().html(targeting)
                 .next()
                 .find('*[name="startdate"]').val(start_date).end()
@@ -456,7 +450,6 @@ $.update_campaign = function(campaign_id36, start_date, end_date,
                 .find('*[name="targeting"]').val(targeting).end()
                 .find('*[name="bid"]').val(bid).end()
                 .find('*[name="cpm"]').val(cpm).end()
-                .find('*[name="speed"]').val(speed).end()
                 .find("button, span").remove();
             $.set_up_campaigns();
         });

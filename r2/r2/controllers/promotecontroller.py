@@ -450,18 +450,16 @@ class PromoteController(ListingController):
                    l=VLink('link_id'),
                    bid=VFloat('bid', min=0, max=g.max_promote_bid,
                               coerce=False, error=errors.BAD_BID),
-                   speed=VOneOf('speed', ('even', 'fast'), default='even'),
                    sr=VSubmitSR('sr', promotion=True),
                    campaign_id36=nop("campaign_id36"),
                    targeting=VLength("targeting", 10))
     def POST_edit_campaign(self, form, jquery, l, campaign_id36,
-                          dates, bid, speed, sr, targeting):
+                          dates, bid, sr, targeting):
         if not l:
             return
 
         start, end = dates or (None, None)
         cpm = g.CPM_PENNIES
-        serve_even = True if speed == 'even' else False
 
         if (start and end and not promote.is_accepted(l) and
             not c.user_is_sponsor):
@@ -563,16 +561,16 @@ class PromoteController(ListingController):
 
         if campaign_id36 is not None:
             campaign = PromoCampaign._byID36(campaign_id36)
-            promote.edit_campaign(l, campaign, dates, bid, cpm, serve_even, sr)
+            promote.edit_campaign(l, campaign, dates, bid, cpm, sr)
             r = promote.get_renderable_campaigns(l, campaign)
             jquery.update_campaign(r.campaign_id36, r.start_date, r.end_date,
-                                   r.duration, r.bid, r.spent, r.cpm, r.speed,
+                                   r.duration, r.bid, r.spent, r.cpm,
                                    r.sr, r.status)
         else:
-            campaign = promote.new_campaign(l, dates, bid, cpm, serve_even, sr)
+            campaign = promote.new_campaign(l, dates, bid, cpm, sr)
             r = promote.get_renderable_campaigns(l, campaign)
             jquery.new_campaign(r.campaign_id36, r.start_date, r.end_date,
-                                r.duration, r.bid, r.spent, r.cpm, r.speed,
+                                r.duration, r.bid, r.spent, r.cpm,
                                 r.sr, r.status)
 
     @validatedForm(VSponsor('link_id'),
