@@ -95,7 +95,7 @@ def min_daily_pageviews(sr, ndays=NDAYS_TO_QUERY):
     query_end = query_end.replace(hour=0, minute=0, second=0, microsecond=0)
     query_start = query_end - datetime.timedelta(days=ndays)
 
-    time_points = traffic.get_time_points('day', start_date, end_date)
+    time_points = traffic.get_time_points('day', query_start, query_end)
     cls = traffic.PageviewsBySubredditAndPath
     q = (traffic.Session.query(cls.srpath, func.min(cls.pageview_count))
                                .filter(cls.interval == 'day')
