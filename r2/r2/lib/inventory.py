@@ -142,8 +142,15 @@ def get_sold_pageviews(sr, start, end):
 def get_available_pageviews(sr, start, end):
     daily_available = min_daily_pageviews(sr)
     sold_by_date = get_sold_pageviews(sr, start, end)
-    return {date.strftime('%m/%d/%Y'): max(0, daily_available - sold)
+    return {date: max(0, daily_available - sold)
             for date, sold in sold_by_date.iteritems()}
+
+
+def get_available_pageviews_json(sr, start, end):
+    available_pageviews = get_available_pageviews(sr, start, end)
+    return {d.strftime('%m/%d/%Y'): val
+            for (d, val) in available_pageviews.iteritems()}
+
 
 def get_oversold(sr, start, end, daily_request):
     available_by_date = get_available_pageviews(sr, start, end)

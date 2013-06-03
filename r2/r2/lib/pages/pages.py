@@ -3278,6 +3278,20 @@ class PromoteLinkForm(Templated):
                            Subreddit.submit_sr_names(None))
         self.default_sr = (self.subreddits[0] if self.subreddits
                            else g.default_sr)
+
+        # preload some inventory
+        srs = Subreddit._by_name(self.subreddits)
+        inv_start = startdate
+        inv_end = startdate + datetime.timedelta(14)
+        self.inventory = {}
+        for sr in srs.itervalues():
+            sr_inventory = inventory.get_available_pageviews_json(sr, inv_start,
+                                                                  inv_end)
+            self.inventory[sr.name] = sr_inventory
+        self.inventory[''] = inventory.get_available_pageviews_json(Frontpage,
+                                                                    inv_start,
+                                                                    inv_end)
+
         self.link = promote.wrap_promoted(link)
         self.listing = listing
         campaigns = PromoCampaign._by_link(link._id)

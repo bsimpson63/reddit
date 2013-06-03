@@ -250,8 +250,9 @@ class PromoteController(ListingController):
                    end=VDate('enddate'))
     def GET_check_inventory(self, responder, sr, start, end):
         sr = sr or Frontpage
-        available_by_date = inventory.get_available_pageviews(sr, start, end)
-        return {'inventory': available_by_date}
+        available_by_datestr = inventory.get_available_pageviews_json(sr, start,
+                                                                      end)
+        return {'inventory': available_by_datestr}
 
     @validate(VSponsor(),
               dates=VDateRange(["startdate", "enddate"],
@@ -549,7 +550,8 @@ class PromoteController(ListingController):
                                           daily_request)
         if oversold:
             available = [('%s available on %s'
-                          % (format_number(av, locale=c.locale), d))
+                          % (format_number(av, locale=c.locale),
+                             d.strftime('%m/%d/%Y')))
                          for d, av in oversold.iteritems()]
             msg_params = {'daily_request': format_number(daily_request,
                                                          locale=c.locale),

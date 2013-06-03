@@ -7,9 +7,17 @@ r.sponsored = {
     r.sponsored.inventory = {}
   },
 
+  setup: function(inventory_by_sr) {
+    r.sponsored.inventory = inventory_by_sr
+  },
+
   get_ndays: function($form) {
-    return Math.round((Date.parse($form.find('*[name="enddate"]').val()) -
-                       Date.parse($form.find('*[name="startdate"]').val())) / (86400*1000))
+    var startstr = $form.find('*[name="startdate"]').val(),
+        endstr = $form.find('*[name="enddate"]').val(),
+        start = $.datepicker.parseDate('mm/dd/yy', startstr),
+        end = $.datepicker.parseDate('mm/dd/yy', endstr),
+        ndays = Math.round((end - start) / (1000 * 60 * 60 * 24))
+    return ndays
   },
 
   get_bid: function($form) {
@@ -35,22 +43,60 @@ r.sponsored = {
       r.sponsored.check_inventory()
   },
 
-  get_check_inventory: function(srname, startdate, enddate) {
-    var key = srname + startdate + enddate
-    return r.sponsored.inventory[key] || $.ajax({
+  get_dates: function(startdate, enddate) {
+    var start = $.datepicker.parseDate('mm/dd/yy', startdate),
+        end = $.datepicker.parseDate('mm/dd/yy', enddate),
+        ndays = (end - start) / (1000 * 60 * 60 * 24),
+        dates = []
+
+    for (var i=0; i < ndays; i++) {
+        var d = new Date(start.getTime())
+        d.setDate(start.getDate() + i)
+        dates.push(d)
+    }
+    return dates
+  },
+
+  get_check_inventory: function(srname, dates) {
+    var fetch = false
+
+    for (var index in dates) {
+        var datestr = $.datepicker.formatDate('mm/dd/yy', dates[index])
+
+        if (!(r.sponsored.inventory[srname] && r.sponsored.inventory[srname][datestr])) {
+          console.log('need to fetch ' + datestr + ' for ' + srname)
+          fetch = true
+          break
+        }
+    }
+
+    if (fetch) {
+      dates.sort(function(d1,d2){return d1 - d2})
+      var end = new Date(dates[dates.length-1].getTime())
+
+      end.setDate(end.getDate() + 5)
+
+      return $.ajax({
         type: 'GET',
         url: '/api/check_inventory.json',
         data: {
             sr: srname,
-            startdate: startdate,
-            enddate: enddate
+            startdate: $.datepicker.formatDate('mm/dd/yy', dates[0]),
+            enddate: $.datepicker.formatDate('mm/dd/yy', end)
         },
         success: function(data) {
-          r.sponsored.inventory[key] = data.inventory
+          if (!r.sponsored.inventory[srname]) {
+            r.sponsored.inventory[srname] = {}
+          }
+
+          for (var datestr in data.inventory) {
+            r.sponsored.inventory[srname][datestr] = data.inventory[datestr]
+          }
         }
-      }).pipe(function(data) {
-        return data.inventory
       })
+    } else {
+      return true
+    }
   },
 
   check_inventory: function() {
@@ -64,29 +110,33 @@ r.sponsored = {
         daily_request = Math.floor(requested / ndays),
         targeted = $campaign.find('#targeting').attr('checked') == 'checked',
         target = $campaign.find('*[name="sr"]').val(),
-        srname = targeted ? target : ''
+        srname = targeted ? target : '',
+        dates = r.sponsored.get_dates(startdate, enddate)
 
-        $.when(r.sponsored.get_check_inventory(srname, startdate, enddate)).done(
-          function(target_inventory) {
+        $.when(r.sponsored.get_check_inventory(srname, dates)).done(
+          function() {
             var oversold = {}
-            for (var date in target_inventory) {
-              var available = target_inventory[date]
+
+            for (var index in dates) {
+              var datestr = $.datepicker.formatDate('mm/dd/yy', dates[index])
+                  available = r.sponsored.inventory[srname][datestr]
+
               if (available < daily_request) {
-                oversold[date] = available
+                oversold[datestr] = available
               }
             }
 
             if (!$.isEmptyObject(oversold)) {
-              var dates = Object.keys(oversold)
+              var oversold_dates = Object.keys(oversold)
               var message = "We have insufficient inventory to fulfill your requested"
               message += " budget, target, and dates."
               message += " (requested " + r.sponsored.pretty_number(daily_request)
-              message += " impressions per day, " + r.sponsored.pretty_number(oversold[dates[0]])
-              message += " available on " + dates[0]
-              for (var index in dates.slice(1)) {
-                var date = dates[index],
-                    available = oversold[date]
-                message += ", " + r.sponsored.pretty_number(available) + " available on " + date
+              message += " impressions per day, " + r.sponsored.pretty_number(oversold[oversold_dates[0]])
+              message += " available on " + oversold_dates[0]
+              for (var index in oversold_dates.slice(1)) {
+                var datestr = oversold_dates[index],
+                    available = oversold[datestr]
+                message += ", " + r.sponsored.pretty_number(available) + " available on " + datestr
               }
               message += ")"
               $(".OVERSOLD_DETAIL").html(message).show()
@@ -138,10 +188,18 @@ r.sponsored = {
        if(input.length) {
           var d = new Date();
           offset = $.with_default(offset, 0);
-          d.setTime(Date.parse(input.val()) + offset);
+          d.setTime($.datepicker.parseDate('mm/dd/yy', input.val()).valueOf() + offset);
           return d;
        }
      }
+  },
+
+  dateFromStr: function(datestr) {
+    return $.datepicker.parseDate('mm/dd/yy', datestr)
+  },
+
+  dateToStr: function(date) {
+    return $.datepicker.formatDate('mm/dd/yy', date)
   },
 
   pretty_number: function(number) {
